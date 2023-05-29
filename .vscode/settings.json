@@ -1,0 +1,12 @@
+{
+    "Lua.workspace.library": [
+        "C:/Users/Hamza/AppData/Roaming/Code/User/globalStorage/sumneko.lua/addonManager/addons/cc-tweaked/module/library"
+    ],
+    "Lua.runtime.version": "Lua 5.3",
+    "Lua.workspace.checkThirdParty": false,
+    "Lua.diagnostics.disable": [
+        "need-check-nil",
+        "missing-parameter",
+        "param-type-mismatch"
+    ]
+}
