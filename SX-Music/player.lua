@@ -3,6 +3,12 @@ local speaker = peripheral.find("speaker") or error("No speaker was found", 0)
 local ext = "dfpwm"
 local files
 local htmlparser = require("parser.htmlparser")
+local web
+if fs.open("./usage.sx", "r").read():find("true") then
+    web = true
+else
+    web = false
+end
 
 function getMusic()
     files = fs.find('*.dfpwm')
@@ -73,7 +79,11 @@ function downloadMusic(name, artist)
 
     print('found song')
     print('Starting the download thread')
-    shell.run("python3 downloader.py "..link)
+    if web then
+        http.post("https://swirx.github.io/ComputerCraft/SX-Music/Web/downloader.py?inputf="..link)
+    else
+        shell.run("python3 downloader.py "..link)
+    end
 end
 
 

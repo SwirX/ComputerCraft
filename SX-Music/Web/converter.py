@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, send_file
 from pydub import AudioSegment
 
 app = Flask(__name__)
@@ -9,18 +9,20 @@ def run_script():
     inputf = request.args.get('inputf')
     outputf = request.args.get('outputf')
 
-    if output_file == None:
-        output_file = input_file[:-3]
+    if outputf is None:
+        outputf = inputf[:-3] + 'dfpwm'
+
     # Load the audio file
-    audio = AudioSegment.from_file(input_file)
+    audio = AudioSegment.from_file(inputf)
 
     # Convert to DFPWM format
     dfpwm_audio = audio.set_sample_width(1)
 
     # Export to DFPWM audio file
-    dfpwm_audio.export(output_file, format='dfpwm')
+    dfpwm_audio.export(outputf, format='dfpwm')
 
-    return 'Script executed with value: ' + str(inputf) + ' and ' + str(outputf)
+    # Download the converted file
+    return send_file(outputf, as_attachment=True)
 
 if __name__ == '__main__':
     app.run()
