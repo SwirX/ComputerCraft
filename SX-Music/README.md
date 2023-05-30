@@ -6,7 +6,7 @@ There is a download function that downloads the song and convert it to dfpwm to 
 
 # How to download
 go to your computer and run<br>
-`pastebin get https://pastebin.com/ELnyY6yE SXMusic_Installer.lua`<br>
+`pastebin get https://pastebin.com/k27D2iBp SXMusic_Installer.lua`<br>
 then when downloaded run it using<br>
 `SXMusic_Installer.lua`
 

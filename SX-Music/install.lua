@@ -138,7 +138,7 @@ local function runInstaller()
     local createShortcut = showMenu("Create a shortcut?", {"Yes", "No"})
     if createShortcut == 1 then
         local shortcut = io.open("sxmusic", "w")
-        local player = io.open("SX-Music/install.lua", "r")
+        local player = io.open("SX-Music/player.lua", "r")
         local content = player:read("*a")
         shortcut:write(content)
         shortcut:close()
