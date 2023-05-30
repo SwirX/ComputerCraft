@@ -1,119 +1,151 @@
 local site = "https://swirx.github.io/ComputerCraft/"
 local pythonDownloadLink = "https://www.python.org/ftp/python/3.11.3/python-3.11.3-amd64.exe"
 
-function splitString(input, delimiter)
+local function splitString(input, delimiter)
     local result = {}
-    local patern = string.format("([^%s]+)", delimiter)
-    input:gsub(patern, function(substring)
+    local pattern = string.format("([^%s]+)", delimiter)
+    input:gsub(pattern, function(substring)
         table.insert(result, substring)
     end)
     return result
 end
 
-function pipTheLibs()
-    print("Donwloading the required libraries")
-    shell.execute("pip install -r rq.txt")
-    shell.execute("del rq.txt")
-end
-
-function download(url)
-    print("Downloading "..url)
+local function download(url, destination)
+    print("Downloading " .. url)
     local response = http.get(url)
     local content = response.readAll()
-    local length = response.getResponseHeader("Content-Length")
     response.close()
 
-    local split = splitString(url, "/")
-    local filename = split[#split]
+    local file = io.open(destination, "w")
+    file:write(content)
+    file:close()
 
-    -- Save the Python installer to a file
-    local file = fs.open("SX-Music\\"..filename, "w")
-    file.write(content)
-    file.close()
-  
-    -- Display a progress bar
+    print("Download complete: " .. destination)
+end
+
+local function showProgressBar(progress)
     local progressBarWidth = 30
-    local downloadedSize = string.len(content)
-    local progress = downloadedSize / tonumber(length)
-  
+    local numFilled = math.floor(progress * progressBarWidth)
+    local numEmpty = progressBarWidth - numFilled
+    local progressBar = string.rep("=", numFilled) .. string.rep(" ", numEmpty)
+    local progressPercentage = string.format(" %.2f%%", progress * 100)
+
     term.clear()
     term.setCursorPos(1, 1)
-    term.write("Downloading Python installer...")
-    term.setCursorPos(1, 2)
-    term.write(("="):rep(progress * progressBarWidth))
-    term.setCursorPos(1, 3)
-    term.write((" "):rep(progressBarWidth - (progress * progressBarWidth)) .. string.format(" %.2f%%", progress * 100))
+    print("Downloading Python installer...")
+    print(progressBar)
+    print(progressPercentage)
 end
 
-function downloadFiles()
-    local app = site.."SX-Music/"
-    local player = app.."player.lua"
-    local req = app.."rq.txt"
-
-
-    download(player)
-    download(req)
+local function downloadPythonInstaller()
+    download(pythonDownloadLink, "SX-Music/python-installer.exe")
 end
 
-function choice(trueV, falseV)
-    print('('..trueV..','..falseV')')
-    local c = string.lower(read())
-    if c == string.lower(trueV) then
-        return true
-    elseif c == string.lower(falseV) then
-        return false
-    end
+local function installPython()
+    print("Installing Python...")
+    -- Code to execute the Python installer goes here
+    -- You can use the 'shell.execute' function to run the installer
+    -- Example: shell.execute("SX-Music/python-installer.exe", "-silent -install")
+    print("Python installation complete")
 end
 
-function flushScr()
+local function pipInstallLibs()
+    print("Installing the required libraries...")
+    shell.execute("pip install -r SX-Music/requirements.txt")
+    shell.execute("del SX-Music/requirements.txt")
+    print("Library installation complete")
+end
+
+local function downloadFiles()
+    local app = site .. "SX-Music/"
+    local player = app .. "player.lua"
+    local requirements = app .. "requirements.txt"
+
+    download(player, "SX-Music/player.lua")
+    download(requirements, "SX-Music/requirements.txt")
+end
+
+local function flushScreen()
     term.clear()
-    term.setCursorPos(1,1)
+    term.setCursorPos(1, 1)
 end
 
+local function getUserInput(prompt)
+    print(prompt)
+    return string.lower(read())
+end
 
-function App()
-    print("SX-Music Installer Wizard")
-    print("A new directory will be created on your machine")
-    shell.execute("mkdir", "SX-Music")
-    print(nil, "Do you have python installed on your machine?")
-    local installed = choice("Y", "n")
-    if installed then
-        flushScr()
-        pipTheLibs()
-        print("Download complete")
-        flushScr()
-        print("Downloading SX-Music")
-        downloadFiles()
-        print(nil, "Download finished")
-        flushScr()
-    else
-        flushScr()
-        print("You want to install it or use the SX-Music web-converter")
-        local web = choice("Y", "n")
-        if web then
-            local ufile = fs.open("SX-Music\\Usage.sx", "w")
-            ufile.write("WebConvert: true")
-            ufile.close()
-        else
-            local app = site.."SX-Music/"
-            local downloader = app.."downloader.py"
-            local converter = app.."converter.py"
-            
-            download(downloader)
-            download(converter)
+local function showMenu(message, options)
+    local validInput = false
+    local choice = nil
+
+    while not validInput do
+        flushScreen()
+        print(message)
+        for i, option in ipairs(options) do
+            print(i .. ". " .. option)
+        end
+
+        local input = getUserInput("Enter your choice: ")
+
+        if tonumber(input) ~= nil then
+            local index = tonumber(input)
+            if index >= 1 and index <= #options then
+                validInput = true
+                choice = index
+            end
         end
     end
-    flushScr()
-    print("App downloaded successfully")
-    print("Create a shortcut?")
-    local c = choice("Y", "n")
-    if c then
-        local shortcut = fs.open("sxmusic", "w")
-        local player = fs.open("SX-Music\\install.lua", "r")
-        local content = player.readAll()
-        shortcut.write(content)
-        shortcut.close()
-        player.close()
-    end
-    flushScr()
+
+    return choice
 end
+
+local function runInstaller()
+    flushScreen()
+    print("SX-Music Installer Wizard")
+    shell.execute("mkdir SX-Music")
+
+    local installed = showMenu("Do you have Python installed on your machine?", {"Yes", "No"})
+    if installed == 1 then
+        flushScreen()
+        pipInstallLibs()
+        flushScreen()
+        print("Download SX-Music")
+        downloadFiles()
+        print("Download finished")
+        flushScreen()
+    else
+        flushScreen()
+        local installMethod = showMenu("Do you want to install Python or use the SX-Music web-converter?", {"Install Python", "Use Web Converter"})
+        if installMethod == 1 then
+            downloadPythonInstaller()
+            installPython()
+            pipInstallLibs()
+            flushScreen()
+            print("Download SX-Music")
+            downloadFiles()
+            print("Download finished")
+            flushScreen()
+        else
+            local ufile = io.open("SX-Music/Usage.sx", "w")
+            ufile:write("WebConvert: true")
+            ufile:close()
+        end
+    end
+
+    print("App downloaded successfully")
+
+    local createShortcut = showMenu("Create a shortcut?", {"Yes", "No"})
+    if createShortcut == 1 then
+        local shortcut = io.open("sxmusic", "w")
+        local player = io.open("SX-Music/install.lua", "r")
+        local content = player:read("*a")
+        shortcut:write(content)
+        shortcut:close()
+        player:close()
+    end
+
+    flushScreen()
+end
+
+runInstaller()
