@@ -46,7 +46,7 @@ def run_script():
 
     # Check the response from the second script
     if response.status_code == 200:
-        return 'Script executed. File converted and sent successfully.'
+        return 'Script executed. File sent successfully.'
     else:
         return 'Error occurred while sending the converted file.'
 

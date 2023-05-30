@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pytube import YouTube
 from moviepy.editor import *
 
@@ -29,6 +30,9 @@ def download(link):
 
     # Print the output file path
     print("Output file:", output_file)
+
+    subprocess.call(['python3', 'converter.py'])
+
 
 
 if __name__ == '__main__':
