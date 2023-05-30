@@ -2,7 +2,16 @@ import os
 from pytube import YouTube
 from moviepy.editor import *
 
-def download(link):
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/')
+def run_script():
+    # Retrieve the value passed as an argument from the URL
+
+    input_file = request.args.get('inputf')
+
     video_url
     if type(link) == int:
         video_url = "https://www.youtube.com/watch?v="+str(link)
@@ -30,8 +39,7 @@ def download(link):
     # Print the output file path
     print("Output file:", output_file)
 
+    return 'Script executed with value: ' + str(value)
 
 if __name__ == '__main__':
-    import sys
-    input_file = sys.argv[1]
-    download(input_file)
+    app.run()
