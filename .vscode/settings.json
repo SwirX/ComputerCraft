@@ -9,5 +9,8 @@
         "missing-parameter",
         "param-type-mismatch",
         "lowercase-global"
+    ],
+    "Lua.diagnostics.globals": [
+        "term"
     ]
 }
