@@ -233,7 +233,7 @@ function UI.Create(elementType, parent)
     end
 
     element.parent = parent or UI
-    element.parent.elements = element.parent.elements or {}
+    element.parent.elements = element.parent.elements or elements
     table.insert(element.parent.elements, element)
 
     return element
