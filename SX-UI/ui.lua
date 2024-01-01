@@ -34,7 +34,7 @@ local Button = {
     if type(fun) == 'function' then
       table.insert(self._onclickevents, fun)
     else
-      error(fun .. "() is not a function")
+      error("The provided argument is not a function", 2)
     end
   end,
   --Removes the element from the UI
@@ -123,10 +123,21 @@ local CheckBox = {
   --[[Private Values]]
   _type = "checkbox",
   _id = generateUniqueID(),
+  _ontoggleevents = {},
   --[[Functions]]
   --Toggles the value
   Toggle = function(self)
     self.value = not self.value
+    for _, func in ipairs(self._ontoggleevents) do
+      func()
+    end
+  end,
+  onToggle = function(self, fun)
+    if type(fun) == 'function' then
+      table.insert(self._ontoggleevents, fun)
+    else
+      error("The provided argument is not a function", 2)
+    end
   end,
   --Stimulate a click
   Click = function(self)
@@ -149,6 +160,74 @@ function CheckBox:Clone()
   -- (position, backgroundColor, value, etc.)
   return clone
 end
+
+--[[TEXTCHECKBOX]]
+local TextCheckBox = {
+  --[[Public Properties]]
+  --The name of the element. Defaults to the element's name
+  _name = "TextCheckBox",
+  --The position of the element. Defaults to x=1, y=1
+  position = { x = 1, y = 1 },
+  --Background color of the element. Defaults to white
+  backgroundColor = colors.white,
+  --Text of the element. Defaults to the name of the element
+  text = "",
+  --Text color of the element. Defaults to black
+  textColor = colors.black,
+  --Text align of the element's text. Default to 'center'
+  textAlign = "center",
+  --Type of the text. Defaults to text
+  textType = "text",
+  --The offset of the text. Defaults to 0
+  offset = 0,
+  --The value of the checkbox, Defaults to false
+  value = false,
+  --[[Private Values]]
+  _type = "textcheckbox",
+  _id = generateUniqueID(),
+  _ontoggleevents = {},
+  --[[Functions]]
+  --Toggles the value
+  Toggle = function(self)
+    self.value = not self.value
+    for _, func in ipairs(self._ontoggleevents) do
+        local s, e = pcall(function ()
+          func()
+        end)
+        if not s then
+          error("Error "..e)
+        end
+    end
+  end,
+  onToggle = function(self, fun)
+    if type(fun) == 'function' then
+      table.insert(self._ontoggleevents, fun)
+    else
+      error("The provided argument is not a function", 2)
+    end
+  end,
+  --Stimulate a click
+  Click = function(self)
+    self:Toggle()
+  end
+}
+--Removes the element from the UI
+function TextCheckBox:Remove()
+  for i, v in pairs(UI.elements.Screen.elements) do
+    if v._id == self._id then
+      table.remove(UI.elements.Screen.elements, i)
+    end
+  end
+end
+
+--Clones the current element
+function TextCheckBox:Clone()
+  local clone = setmetatable({}, { __index = TextCheckBox })
+  -- Copy properties from self to clone
+  -- (position, backgroundColor, value, etc.)
+  return clone
+end
+
 
 --[[TEXTBOX]]
 local TextBox = {
@@ -187,7 +266,7 @@ end
 
 function TextBox:Focus(state)
   if type(state) == "nil" then state = true end
-  if type(state) ~= "boolean" then error("Wrong type passed. Expected a boolean, got " .. type(state)) end
+  if type(state) ~= "boolean" then error("Wrong type passed. Expected a boolean, got " .. type(state), 2) end
   self.focused = state
   term.setCursorPos(self.position.x, self.position.y)
   term.setCursorBlink(true)
@@ -232,7 +311,7 @@ function TextBox:Focus(state)
     elseif key == 12 then
       self.text = self.text .. ")"
     end
-    UI.Render()
+    Render()
   until not self.focused
   term.setCursorBlink(false)
 end
@@ -258,11 +337,34 @@ Slider = {
   --[[Private Properties]]
   _type = "slider",
   _id = generateUniqueID(),
-  _onchange = {},
+  _onchangeevents = {},
+  onChange = function(self, fun)
+    if type(fun) == 'function' then
+      table.insert(self._onchangeevents, fun)
+    else
+      error("The provided argument is not a function", 2)
+    end
+  end,
+  --Removes the element from the UI
+  Remove = function(self)
+    for i, v in pairs(UI.elements.Screen.elements) do
+      if v._id == self._id then
+        table.remove(UI.elements.Screen.elements, i)
+      end
+    end
+  end,
+  --Stimulate a user click
+  Change = function(self, value)
+    if value == nil then value = 0 end
+    self.value = self.value + value
+    for _, func in ipairs(self._onchangeevents) do
+      func(self.value)
+    end
+  end
 }
 function Slider:Focus(state)
   if type(state) == "nil" then state = true end
-  if type(state) ~= "boolean" then error("Wrong type passed. Expected a boolean, got " .. type(state)) end
+  if type(state) ~= "boolean" then error("Wrong type passed. Expected a boolean, got " .. type(state), 2) end
   self.focused = state
 end
 
@@ -326,7 +428,7 @@ end
 
 function UI.Create(type, parent)
   if parent == nil then parent = UI.elements end
-  -- if not UI.hasScreen then error("The screen element is not present. Use UI.Screen()") end
+  -- if not UI.hasScreen then error("The screen element is not present. Use UI.Screen()", 2) end
   if type == "button" then
     local element = setmetatable({}, { __index = Button })
     element._id = generateUniqueID()
@@ -339,6 +441,11 @@ function UI.Create(type, parent)
     return element
   elseif type == "checkbox" then
     local element = setmetatable({}, { __index = CheckBox })
+    element._id = generateUniqueID()
+    table.insert(parent, element)
+    return element
+  elseif type == "textcheckbox" then
+    local element = setmetatable({}, { __index = TextCheckBox })
     element._id = generateUniqueID()
     table.insert(parent, element)
     return element
@@ -358,7 +465,7 @@ function UI.Create(type, parent)
     table.insert(parent, element)
     return element
   else
-    error("Invalid element type: " .. tostring(type))
+    error("Invalid element type: " .. tostring(type), 2)
   end
 end
 
@@ -369,101 +476,160 @@ end
 
 --[[RENDERING]]
 
-function UI.Render()
+local function Render(source)
+  if source == nil then source = UI.elements end
   UI.Clear()
-  -- if not UI.hasScreen then error("At least one screen should exist") end
-  for index, properties in pairs(UI.elements) do
-    local type = properties._type
-    if type == "textlabel" or type == "button" then
-      local x, y = properties.position.x, properties.position.y
-      term.setCursorPos(x, y)
-      term.setBackgroundColor(properties.backgroundColor)
-      term.setTextColor(properties.textColor)
-      term.write(string.rep(" ", properties.offset) .. properties.text .. string.rep(" ", properties.offset))
-    elseif type == "textbox" then
-      local x, y = properties.position.x, properties.position.y
-      local txt
-      local clr
-      local ogtext = #properties.text or 0
-      if properties.text == "" then
-        txt = properties.placeholderText
-        clr = properties.placeholderTextColor
-      elseif properties.textType == "password" then
-        if ogtext == nil then ogtext = 0 end
-        txt = string.rep("*", ogtext)
-      else
-        txt = properties.text
-        clr = properties.textColor
-      end
-      term.setCursorPos(x, y)
-      term.setBackgroundColor(properties.backgroundColor)
-      term.setTextColor(clr)
-      term.write(string.rep(" ", properties.offset) .. txt .. string.rep(" ", properties.offset))
-    elseif type == "checkbox" then
-      local x, y = properties.position.x, properties.position.y
-      local checked = properties.value
-      term.setCursorPos(x, y)
-      term.setBackgroundColor(properties.backgroundColor)
-      term.setTextColor(properties.textColor)
-      if checked then
-        term.write("[X]")
-      else
-        term.write("[ ]")
-      end
-    elseif type == "slider" then
-      local x, y = properties.position.x, properties.position.y
-      local value = properties.value
-      local width = properties.width
-      local sliderPosition = math.floor((value / 100) * width) + x
-      term.setCursorPos(x, y)
-      term.setBackgroundColor(properties.backgroundColor)
-      term.setTextColor(properties.sliderColor)
-      local text = string.rep(" ", sliderPosition - x) .. "#" .. string.rep(" ", width - (sliderPosition - x) - 1)
-      term.write(text)
-    elseif type == "frame" then
-      local x, y = properties.position.x, properties.position.y
-      local width = properties.width+1
-      local height = properties.height+1
-      local children = properties.childNodes
-      term.setBackgroundColor(properties.backgroundColor)
-      term.setTextColor(colors.black)
-    
-      -- Render top border
-      term.setCursorPos(x, y)
-      term.write(string.rep("-", width))
-    
-      -- Render sides
-      for i = 1, height do
-        term.setCursorPos(x, y + i)
-        term.write("|")
-        term.write(string.rep(" ", width - 2))
-        term.setCursorPos(x + width - 1, y + i)
-        term.write("|")
-      end
-    
-      -- Render bottom border
-      term.setCursorPos(x, y + height)
-      term.write(string.rep("-", width))
+  -- if not UI.hasScreen then error("At least one screen should exist", 2) end
+    for index, properties in pairs(source) do
+      local type = properties._type
+      if type == "textlabel" or type == "button" or type == "textcheckbox" then
+        local isTxtCB = type == "textcheckbox"
+        local x, y = properties.position.x, properties.position.y
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(properties.textColor)
+        term.write(string.rep(" ", properties.offset) .. properties.text .. string.rep(" ", properties.offset))
+        if isTxtCB then
+          local checked = properties.value
+          if checked then
+            term.write(" [X]")
+          else
+            term.write(" [ ]")
+          end
+        end
+      elseif type == "textbox" then
+        local x, y = properties.position.x, properties.position.y
+        local txt
+        local clr
+        local ogtext = #properties.text or 0
+        if properties.text == "" then
+          txt = properties.placeholderText
+          clr = properties.placeholderTextColor
+        elseif properties.textType == "password" then
+          if ogtext == nil then ogtext = 0 end
+          txt = string.rep("*", ogtext)
+        else
+          txt = properties.text
+          clr = properties.textColor
+        end
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(clr)
+        term.write(string.rep(" ", properties.offset) .. txt .. string.rep(" ", properties.offset))
+      elseif type == "checkbox" then
+        local x, y = properties.position.x, properties.position.y
+        local checked = properties.value
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(properties.textColor)
+        if checked then
+          term.write("[X]")
+        else
+          term.write("[ ]")
+        end
+      elseif type == "slider" then
+        local x, y = properties.position.x, properties.position.y
+        local value = properties.value
+        local width = properties.width
+        local sliderPosition = math.floor((value / 100) * width)
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(properties.sliderColor)
+        -- if sliderPosition == 0 then sliderPosition = 1 end
+          local text = string.rep(" ", sliderPosition) .. "#" .. string.rep(" ", width - sliderPosition)
+          term.write(text)
+      elseif type == "frame" then
+        local x, y = properties.position.x, properties.position.y
+        local width = properties.width+1
+        local height = properties.height+1
+        local children = properties.childNodes
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(colors.black)
+      
+        -- Render top border
+        term.setCursorPos(x, y)
+        term.write(string.rep("-", width))
+      
+        -- Render sides
+        for i = 1, height do
+          term.setCursorPos(x, y + i)
+          term.write("|")
+          term.write(string.rep(" ", width - 2))
+          term.setCursorPos(x + width - 1, y + i)
+          term.write("|")
+        end
+      
+        -- Render bottom border
+        term.setCursorPos(x, y + height)
+        term.write(string.rep("-", width))
 
-      for _, child in ipairs(children) do
-        local childX = x + child.position.x
-        local childY = y + child.position.y
-        term.setCursorPos(childX, childY)
-        term.setBackgroundColor(child.backgroundColor)
-        term.setTextColor(child.textColor)
-        term.write(child.text)
+        for findex, fprops in ipairs(children) do
+          local type = properties._type
+      if type == "textlabel" or type == "button" then
+        local x, y = properties.position.x, properties.position.y
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(properties.textColor)
+        term.write(string.rep(" ", properties.offset) .. properties.text .. string.rep(" ", properties.offset))
+      elseif type == "textbox" then
+        local x, y = properties.position.x, properties.position.y
+        local txt
+        local clr
+        local ogtext = #properties.text or 0
+        if properties.text == "" then
+          txt = properties.placeholderText
+          clr = properties.placeholderTextColor
+        elseif properties.textType == "password" then
+          if ogtext == nil then ogtext = 0 end
+          txt = string.rep("*", ogtext)
+        else
+          txt = properties.text
+          clr = properties.textColor
+        end
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(clr)
+        term.write(string.rep(" ", properties.offset) .. txt .. string.rep(" ", properties.offset))
+      elseif type == "checkbox" then
+        local x, y = properties.position.x, properties.position.y
+        local checked = properties.value
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(properties.textColor)
+        if checked then
+          term.write("[X]")
+        else
+          term.write("[ ]")
+        end
+      elseif type == "slider" then
+        local x, y = properties.position.x, properties.position.y
+        local value = properties.value
+        local width = properties.width
+        local sliderPosition = math.floor((value / 100) * width)
+        term.setCursorPos(x, y)
+        term.setBackgroundColor(properties.backgroundColor)
+        term.setTextColor(properties.sliderColor)
+        -- if sliderPosition == 0 then sliderPosition = 1 end
+          local text = string.rep(" ", sliderPosition) .. "#" .. string.rep(" ", width - sliderPosition)
+          term.write(text)
       end
+        end
+      end
+      
+      UI.elements[index] = properties
     end
-    
-    UI.elements[index] = properties
+    term.setBackgroundColor(UI.elements.Screen.backgroundColor)
+    term.setTextColor(UI.elements.Screen.textColor)
   end
-  term.setBackgroundColor(UI.elements.Screen.backgroundColor)
-  term.setTextColor(UI.elements.Screen.textColor)
+
+function ClearScreen()
+  term.clear()
+  term.setCursorPos(1,1)
 end
 
 --[[INPUT HANDELING]]
 function UI.HandleInput()
-  UI.Render()
+  Render()
   while true do
     local event, button, x, y = os.pullEvent("mouse_click")
     for element, properties in pairs(UI.elements) do
@@ -481,6 +647,13 @@ function UI.HandleInput()
         if y == ey and x >= ex and x <= ex + #text - 1 then
           UI.elements[element]:Click()
         end
+      elseif type == "textcheckbox" then
+        local ex, ey = properties.position.x, properties.position.y
+        local text = properties.text .. " [ ]"
+        local offset = properties.offset
+        if y == ey and x >= ex and x <= ex + #text + offset - 1 then
+          UI.elements[element]:Toggle()
+        end
       elseif type == "textbox" then
         local ex, ey = properties.position.x, properties.position.y
         local text
@@ -493,24 +666,59 @@ function UI.HandleInput()
         if y == ey then
           if y == ey and x >= ex and x <= ex + #text + offset - 1 then
             UI.elements[element]:Click()
+          else
+            UI.elements[element]:Focus(false)
           end
         end
       elseif type == "slider" then
         local ex, ey = properties.position.x, properties.position.y
         local width = properties.width
         local value = properties.value
-        local scrollBarPosition = math.floor((value / 100) * width) + ex
-
-        if y == ey and x >= ex and x <= ex + width then
+        local initialScrollBarPosition = math.floor((value / 100) * width) + ex
+        -- if properties.focused then
+        --   local _, key = os.pullEvent('key')
+        --   if key == keys.left then
+        --     UI.elements[element]:Change(-1)
+        --   elseif key == keys.right then
+        --     UI.elements[element]:Change(1)
+        --   end
+        -- end
+        if y == ey and x == initialScrollBarPosition then
+          UI.elements[element]:Focus()
           local _, _, x2, _ = os.pullEvent("mouse_up")
-          local _, _, ux, _ = os.pullEvent("mouse_drag")
-          local delta = ux - x2
-          properties.value = value + delta
+          -- Calculate the new value based on the change in position
+          local newValue = (x2 - ex) * 10
+          if newValue == 0 then
+            newValue = value
+          elseif newValue < 0 then
+            newValue = 0
+          elseif newValue > 100 then
+            newValue = 100
+          end
+          -- Calculate the change in value
+          local delta = newValue - value
+          
+          -- Trigger the Change event and pass the delta value
+          UI.elements[element]:Change(delta)
+        elseif y == ey and x >= ex and x <= ex + width and x ~= initialScrollBarPosition then
+          UI.elements[element]:Focus()
+          local newValue = (x - ex) * 10
+          if newValue < 0 then
+            newValue = 0
+          elseif newValue > 100 then
+            newValue = 100
+          end
+          local delta = newValue - value
+          UI.elements[element]:Change(delta)
         end
       end
     end
-    UI.Render()
+    Render()
   end
+end
+
+function UI.Refresh()
+  Render()
 end
 
 function contains(element, table)
