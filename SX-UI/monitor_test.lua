@@ -7,19 +7,18 @@ if not mon then
 end
 
 mon.setTextScale(1)
--- Creating a screen natively linked to a monitor
 local screen = ui.Screen(mon)
 
 local label = ui.Label("Monitor UI Test v" .. ui._VERSION)
-label.width = 25
-label.height = 1
+label.size.scaleX = 1
+label.size.offsetY = 1
 label.align = "center"
 label.backgroundColor = colors.blue
 screen:addChild(label)
 
 local btn = ui.Button("Touch Me")
-btn.y = 3
-btn.width = 10
+btn.position.offsetY = 3
+btn.size.offsetX = 10
 btn.backgroundColor = colors.gray
 btn.onClick = function(self)
     label.text = "Touched!"
@@ -28,8 +27,8 @@ end
 screen:addChild(btn)
 
 local quit = ui.Button("Quit")
-quit.y = 5
-quit.width = 10
+quit.position.offsetY = 5
+quit.size.offsetX = 10
 quit.backgroundColor = colors.red
 quit.onClick = function()
     screen:stop()
