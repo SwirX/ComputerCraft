@@ -1,62 +1,43 @@
 -- SX-Mine v3.0.0 Installer
 -- Handles master (dashboard) and node (turtle) deployments.
 
-local SXMINE_VERSION   = "3.0.0"
-local SXUI_VERSION     = "2.2.0"
+local SXMINE_VERSION     = "3.0.0"
+local SXUI_VERSION       = "2.2.0"
 
-local REPO_USER        = "SwirX"
-local REPO_NAME        = "ComputerCraft"
-local REPO_BRANCH      = "main"
+local REPO_USER          = "SwirX"
+local REPO_NAME          = "ComputerCraft"
+local REPO_BRANCH        = "main"
 
-local SXMINE_BASE      = "SX-Mine/"
-local SXUI_BASE        = "SX-UI/"
-local SXUI_INSTALL_DIR = "/lib/sxui/"
-local SXMINE_DIR       = "/sxmine/"
+local SXMINE_BASE        = "SX-Mine/"
+local SXUI_BASE          = "SX-UI/"
+local SXUI_INSTALL_DIR   = "/lib/sxui/"
+local SXMINE_DIR         = "/sxmine/"
 
 -- Files installed on every device
-local SHARED_FILES     = {
+local SHARED_FILES       = {
     "net.lua",
 }
 
 -- Files only installed on the main computer
-local MASTER_FILES     = {
+local MASTER_FILES       = {
     "dashboard.lua",
     "provision.lua", -- Written by this installer from embedded source
 }
 
 -- Files only installed on turtles
-local NODE_FILES       = {
+local NODE_FILES         = {
     "miner.lua",
     "tracker.lua",
     "inventory.lua",
     "startup.lua",
 }
 
--- SX-UI files needed by the master dashboard
-local SXUI_FILES       = {
-    "ui.lua",
-    "core/class.lua",
-    "core/animator.lua",
-    "core/element.lua",
-    "core/screen.lua",
-    "widgets/frame.lua",
-    "widgets/appwindow.lua",
-    "widgets/button.lua",
-    "widgets/label.lua",
-    "widgets/input.lua",
-    "widgets/checkbox.lua",
-    "widgets/slider.lua",
-    "widgets/multiline.lua",
-    "widgets/textedit.lua",
-    "widgets/scrollpanel.lua",
-    "widgets/dropdown.lua",
-    "widgets/colorselector.lua",
-}
+local SXUI_INSTALLER_URL = "https://raw.githubusercontent.com/SwirX/ComputerCraft/main/SX-UI/install.lua"
 
 -- The provision.lua source is embedded here so the installer can write it to
 -- disk without needing a separate download. This avoids a chicken-and-egg
 -- problem where the master needs provision.lua before any turtle is online.
-local PROVISION_SOURCE = [[
+local PROVISION_SOURCE   = [[
 -- SX-Mine v3.0.0 Provision Script
 -- Run on the master to push node files to a connected turtle via Rednet.
 local Net = require("sxmine.net")
@@ -150,35 +131,20 @@ end
 -- SX-UI check --------------------------------------------------------------
 
 local function isSxuiInstalled()
-    -- We check for the version marker we write on every install.
-    return fs.exists(SXUI_INSTALL_DIR .. ".version")
-        and (function()
-            local f = fs.open(SXUI_INSTALL_DIR .. ".version", "r")
-            local v = f.readAll()
-            f.close()
-            return v == SXUI_VERSION
-        end)()
+    -- Check for the version marker written by the SX-UI installer.
+    if not fs.exists(SXUI_INSTALL_DIR .. ".version") then return false end
+    local f = fs.open(SXUI_INSTALL_DIR .. ".version", "r")
+    local v = f.readAll()
+    f.close()
+    return v == SXUI_VERSION
 end
 
 local function installSxui()
-    printColored(colors.yellow, "\nInstalling SX-UI v" .. SXUI_VERSION .. "...")
-    ensureDir(SXUI_INSTALL_DIR)
-    ensureDir(SXUI_INSTALL_DIR .. "core")
-    ensureDir(SXUI_INSTALL_DIR .. "widgets")
-
-    local allOk = true
-    for _, path in ipairs(SXUI_FILES) do
-        local ok = downloadTo(SXUI_BASE, path, SXUI_INSTALL_DIR .. path)
-        if not ok then allOk = false end
-    end
-
-    if allOk then
-        writeFile(SXUI_INSTALL_DIR .. ".version", SXUI_VERSION)
-        printColored(colors.lime, "SX-UI installed.")
-    else
-        printColored(colors.red, "Some SX-UI files failed. Check your internet connection.")
-    end
-    return allOk
+    printColored(colors.yellow, "\nInstalling SX-UI v" .. SXUI_VERSION .. " via its own installer...")
+    -- Delegating to the official SX-UI installer keeps us from maintaining a
+    -- duplicate file list that will drift out of sync with upstream.
+    shell.run("wget", "run", SXUI_INSTALLER_URL)
+    printColored(colors.lime, "SX-UI install step done.")
 end
 
 -- Mode selection -----------------------------------------------------------

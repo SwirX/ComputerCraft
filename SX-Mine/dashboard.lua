@@ -1,3 +1,7 @@
+-- CC sets CWD to the script folder, so absolute-style requires break unless
+-- we explicitly add root-based search paths here.
+package.path = "/?.lua;/?/init.lua;" .. package.path
+
 local Net = require("net")
 local ui = require("lib.sxui.ui")
 
