@@ -1,3 +1,9 @@
+-- Auto-inject package path so the framework loads internal modules without touching startup.lua
+local libPath = "/lib/sxui/?.lua"
+if not package.path:find(libPath, 1, true) then
+    package.path = package.path .. ";" .. libPath
+end
+
 local _VERSION = "2.0.0"
 
 local UI = {

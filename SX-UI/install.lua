@@ -18,7 +18,7 @@ local FILES = {
     "widgets/multiline.lua",
 }
 
-local INSTALL_DIR = "/.sxui/"
+local INSTALL_DIR = "/lib/sxui/"
 
 print("Starting installation of SX-UI v2.0.0...")
 
@@ -46,39 +46,7 @@ for _, path in ipairs(FILES) do
     downloadFile(path)
 end
 
--- Safely inject into package.path so require("ui") resolves flawlessly
-local startupFile = "/startup.lua"
-local hookLine = "package.path = package.path .. ';/.sxui/?.lua'"
-local content = ""
+print("\nSuccessfully installed SX-UI into: " .. INSTALL_DIR)
+print("No startup modifications were required. You can load it instantly with:")
+print([[local ui = require("lib.sxui.ui")]])
 
-if fs.exists(startupFile) then
-    if not fs.isDir(startupFile) then
-        local f = fs.open(startupFile, "r")
-        content = f.readAll() or ""
-        f.close()
-    end
-end
-
-if not content:find(hookLine, 1, true) then
-    if fs.isDir(startupFile) then
-        -- User is using a /startup/ directory structure
-        local hookFile = fs.open("/startup/00_sxui.lua", "w")
-        hookFile.write "-- SX-UI Global Path Hook\n"
-        hookFile.write(hookLine .. "\n")
-        hookFile.close()
-    else
-        local f = fs.open(startupFile, "a")
-        if content ~= "" and not content:match("\n$") then
-            f.write("\n")
-        end
-        f.write("-- SX-UI Global Path Hook\n")
-        f.write(hookLine .. "\n")
-        f.close()
-    end
-end
-
--- Update path dynamically for the current session without requiring reboot
-package.path = package.path .. ";/.sxui/?.lua"
-
-print("\nSuccessfully installed SX-UI to hidden directory: " .. INSTALL_DIR)
-print("Startup file hooked. You can seamlessly `require(\"ui\")` in your projects.")
