@@ -1,100 +1,187 @@
 local ui = require("lib.sxui.ui")
 
+-- Mega-test showing every widget in a multi-window layout.
+-- Two draggable AppWindows are placed on screen. Each demonstrates different widgets.
+-- Drag them from their titlebars to reposition.
+
 local screen = ui.Screen()
 
-local frame = ui.Frame()
-frame.position.offsetX = 2
-frame.position.offsetY = 2
--- Scaled Frame! It binds to 80% of screen width and 17 characters tall.
-frame.size.scaleX = 0.8
-frame.size.offsetY = 17
-frame.draggable = true
-screen:addChild(frame)
+-- -------------------------
+-- Window 1 -- Core Widgets
+-- -------------------------
+local win1 = ui.AppWindow("Core Widgets")
+win1.position.offsetX = 1
+win1.position.offsetY = 1
+win1.size.offsetX = 36
+win1.size.offsetY = 16
+win1.zIndex = 1
+screen:addChild(win1)
 
-local title = ui.Label("SX-UI v" .. ui._VERSION)
-title.position.offsetX = 0
-title.position.offsetY = 0
-title.size.scaleX = 1 -- Takes up 100% of parent width dynamically
-title.align = "center"
-title.backgroundColor = colors.blue
-title.foregroundColor = colors.white
-frame:addChild(title)
-
-local clicks = 0
+local clickCount = 0
 local clickLabel = ui.Label("Clicks: 0")
-clickLabel.position.offsetX = 3
-clickLabel.position.offsetY = 4
+clickLabel.position.offsetX = 2
+clickLabel.position.offsetY = 2
 clickLabel.size.offsetX = 15
-frame:addChild(clickLabel)
+win1:addChild(clickLabel)
 
-local btn = ui.Button("Click Me")
-btn.position.offsetX = 3
-btn.position.offsetY = 5
-btn.size.offsetX = 15
+local btn = ui.Button("Click Me!")
+btn.position.offsetX = 2
+btn.position.offsetY = 3
+btn.size.offsetX = 12
+btn.backgroundColor = colors.blue
 btn.onClick = function(self)
-    clicks = clicks + 1
-    clickLabel.text = "Clicks: " .. clicks
-
-    self.backgroundColor = colors.red
-
-    ui.Animator.animate(1, 0, 0.2, nil, nil, function()
-        self.backgroundColor = colors.gray
+    clickCount = clickCount + 1
+    clickLabel.text = "Clicks: " .. clickCount
+    self.backgroundColor = colors.purple
+    ui.Animator.animate(1, 0, 0.3, ui.Animator.Easing.SineOut, nil, function()
+        self.backgroundColor = colors.blue
     end)
 end
-frame:addChild(btn)
+win1:addChild(btn)
 
-local input = ui.Input()
-input.position.offsetX = 20
-input.position.offsetY = 5
-input.size.offsetX = 20
-input.placeholder = "Type here..."
-frame:addChild(input)
+local chk = ui.Checkbox("Toggle me")
+chk.position.offsetX = 2
+chk.position.offsetY = 5
+win1:addChild(chk)
 
-local chk = ui.Checkbox("Enable features")
-chk.position.offsetX = 3
-chk.position.offsetY = 8
-frame:addChild(chk)
+local inputLabel = ui.Label("Text input:")
+inputLabel.position.offsetX = 2
+inputLabel.position.offsetY = 7
+inputLabel.size.offsetX = 12
+win1:addChild(inputLabel)
+
+local inp = ui.Input()
+inp.position.offsetX = 2
+inp.position.offsetY = 8
+inp.size.offsetX = 30
+inp.placeholder = "Type something..."
+win1:addChild(inp)
+
+local sliderLabel = ui.Label("Slider: 50")
+sliderLabel.position.offsetX = 2
+sliderLabel.position.offsetY = 10
+sliderLabel.size.offsetX = 16
+win1:addChild(sliderLabel)
 
 local slider = ui.Slider()
-slider.position.offsetX = 3
-slider.position.offsetY = 10
-slider.size.offsetX = 15
+slider.position.offsetX = 2
+slider.position.offsetY = 11
+slider.size.offsetX = 30
 slider.min = 0
 slider.max = 100
 slider.value = 50
-
-local sliderVal = ui.Label("50%")
-sliderVal.position.offsetX = 20
-sliderVal.position.offsetY = 10
-sliderVal.size.offsetX = 10
 slider.onChange = function(self, val)
-    sliderVal.text = math.floor(val) .. "%"
+    sliderLabel.text = "Slider: " .. math.floor(val)
 end
-frame:addChild(slider)
-frame:addChild(sliderVal)
+win1:addChild(slider)
 
-local multi = ui.Multiline(
-"This is a multiline text block.\nIt natively wraps text correctly according to Scale width constraints!")
-multi.position.offsetX = 3
-multi.position.offsetY = 12
--- Bound multiline size tracking 90% of frame width
-multi.size.scaleX = 0.90
-multi.size.offsetY = 3
-multi.backgroundColor = colors.black
-frame:addChild(multi)
+local ddLabel = ui.Label("Pick a shape:")
+ddLabel.position.offsetX = 2
+ddLabel.position.offsetY = 13
+ddLabel.size.offsetX = 14
+win1:addChild(ddLabel)
 
-local quitBtn = ui.Button("Quit")
--- Pins perfectly to the bottom-right of the frame recursively
-quitBtn.position.scaleX = 1
-quitBtn.position.offsetX = -6
-quitBtn.position.scaleY = 1
-quitBtn.position.offsetY = -1
-quitBtn.size.offsetX = 6
-quitBtn.backgroundColor = colors.red
-quitBtn.onClick = function()
+local dd = ui.Dropdown({ "Circle", "Square", "Triangle", "Hexagon" })
+dd.position.offsetX = 2
+dd.position.offsetY = 14
+dd.size.offsetX = 15
+dd.zIndex = 20 -- float above siblings when open
+win1:addChild(dd)
+
+-- -------------------------
+-- Window 2 -- Text and Colors
+-- -------------------------
+local win2 = ui.AppWindow("Text & Colors")
+win2.position.offsetX = 39
+win2.position.offsetY = 1
+win2.size.offsetX = 30
+win2.size.offsetY = 18
+win2.zIndex = 1
+screen:addChild(win2)
+
+local teLabel = ui.Label("Multiline Editor:")
+teLabel.position.offsetX = 2
+teLabel.position.offsetY = 2
+teLabel.size.offsetX = 20
+win2:addChild(teLabel)
+
+local te = ui.TextEdit()
+te.position.offsetX = 2
+te.position.offsetY = 3
+te.size.offsetX = 26
+te.size.offsetY = 5
+win2:addChild(te)
+
+local colorLabel = ui.Label("Pick a color:")
+colorLabel.position.offsetX = 2
+colorLabel.position.offsetY = 9
+colorLabel.size.offsetX = 20
+win2:addChild(colorLabel)
+
+local selectedColorLabel = ui.Label("Selected: white")
+selectedColorLabel.position.offsetX = 2
+selectedColorLabel.position.offsetY = 10
+selectedColorLabel.size.offsetX = 20
+win2:addChild(selectedColorLabel)
+
+local colorPicker = ui.ColorSelector()
+colorPicker.position.offsetX = 2
+colorPicker.position.offsetY = 11
+colorPicker.columns = 8
+colorPicker.tileWidth = 2
+colorPicker.onChange = function(self, color)
+    -- Find name by looking up the colors table
+    for name, val in pairs(colors) do
+        if type(val) == "number" and val == color then
+            selectedColorLabel.text = "Selected: " .. name
+            break
+        end
+    end
+end
+win2:addChild(colorPicker)
+
+-- -------------------------
+-- Window 3 -- Scroll Panel
+-- -------------------------
+local win3 = ui.AppWindow("Scroll Panel")
+win3.position.offsetX = 1
+win3.position.offsetY = 19
+win3.size.offsetX = 35
+win3.size.offsetY = 8
+win3.zIndex = 1
+screen:addChild(win3)
+
+local sp = ui.ScrollPanel()
+sp.position.offsetX = 2
+sp.position.offsetY = 2
+sp.size.offsetX = 30
+sp.size.offsetY = 5
+sp.backgroundColor = colors.black
+win3:addChild(sp)
+
+-- Fill the scroll panel with multiple labels to scroll through
+for i = 1, 15 do
+    local row = ui.Label("Item " .. i .. " -- scroll me down!")
+    row.position.offsetX = 1
+    row.position.offsetY = i
+    row.size.offsetX = 28
+    row.foregroundColor = (i % 2 == 0) and colors.lime or colors.white
+    sp:addChild(row)
+end
+
+-- -------------------------
+-- Quit Button on Screen Root
+-- -------------------------
+local quit = ui.Button("[ QUIT ]")
+quit.position.offsetX = 1
+quit.position.scaleY = 1
+quit.position.offsetY = -1
+quit.size.offsetX = 10
+quit.backgroundColor = colors.red
+quit.foregroundColor = colors.white
+quit.onClick = function()
     screen:stop()
 end
-frame:addChild(quitBtn)
+screen:addChild(quit)
 
--- Start the framework loop
 screen:run()
