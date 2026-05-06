@@ -1,67 +1,94 @@
---require the library
 local ui = require("ui")
 
---initialise the ui
-ui.init()
+local screen = ui.Screen()
 
---set a screen
-local screen = ui.Screen()  -- you can pass the screen name if you like or leave it empty
+local frame = ui.Frame()
+frame.x = 2
+frame.y = 2
+frame.width = 48
+frame.height = 17
+frame.draggable = true -- Enable drag!
+screen:addChild(frame)
 
-clicks = 0
+local title = ui.Label("SX-UI v" .. ui._VERSION)
+title.x = 1
+title.y = 1
+title.width = frame.width
+title.align = "center"
+title.backgroundColor = colors.blue
+title.foregroundColor = colors.white
+frame:addChild(title)
 
---create a textlabel
-label = ui.Create("textlabel")
-label.text = term.getSize()
+local clicks = 0
+local clickLabel = ui.Label("Clicks: 0")
+clickLabel.x = 3
+clickLabel.y = 4
+clickLabel.width = 15
+frame:addChild(clickLabel)
 
---create a button
-button = ui.Create("button") -- thhe parent can be passed as the second argument
-button.text = "This is a button"
-button.backgroundColor = colors.red
-button.textColor = colors.white
-button.position = {x=1, y=3}
-button:onClick(function ()
-    button.backgroundColor = colors.blue
+local btn = ui.Button("Click Me")
+btn.x = 3
+btn.y = 5
+btn.width = 15
+btn.onClick = function(self)
     clicks = clicks + 1
-    text = string.format("the button has been clicked %d time", clicks)
-    if clicks ~= 1 then text = text .. "s" end
-    label.text = text
-end)
+    clickLabel.text = "Clicks: " .. clicks
+    
+    self.backgroundColor = colors.red
+    
+    ui.Animator.animate(1, 0, 0.2, nil, nil, function()
+        self.backgroundColor = colors.gray
+    end)
+end
+frame:addChild(btn)
 
+local input = ui.Input()
+input.x = 20
+input.y = 5
+input.width = 20
+input.placeholder = "Type here..."
+frame:addChild(input)
 
---create a textbox
-textbox = ui.Create("textbox")
-textbox.clearOnFocus = false -- wether or not the text would be cleared when focusing the textbox
-textbox.placeholderText = "click here to write"
-textbox.offset = 2 -- the offset of the text in relation with the width of the textbox
-textbox.position = {x=1, y=4}
+local chk = ui.Checkbox("Enable features")
+chk.x = 3
+chk.y = 8
+frame:addChild(chk)
 
---create a frame
-frame = ui.Create("frame")
-frame.position = {x=1, y=5}
-frame.width = 51
-frame.height = 15
-frame.backgroundColor = colors.green
+local slider = ui.Slider()
+slider.x = 3
+slider.y = 10
+slider.width = 15
+slider.min = 0
+slider.max = 100
+slider.value = 50
 
+local sliderVal = ui.Label("50%")
+sliderVal.x = 20
+sliderVal.y = 10
+sliderVal.width = 10
+slider.onChange = function(self, val)
+    sliderVal.text = math.floor(val) .. "%"
+end
+frame:addChild(slider)
+frame:addChild(sliderVal)
 
---create a slider
-slider = ui.Create("slider")
-slider.position = {x=5, y=7}
-sliderValue = ui.Create("textlabel")
-sliderValue.position = {x=5, y=8}
-slider:onChange(function (value)
-    sliderValue.text = string.format("%d", value)
-end)
+local multi = ui.Multiline("This is a multiline text block.\nIt automatically wraps text if it's too long, and is totally supported in v2.0.0.")
+multi.x = 3
+multi.y = 12
+multi.width = 40
+multi.height = 3
+multi.backgroundColor = colors.black
+frame:addChild(multi)
 
---[[        uncomment the commented lines bellow if
-            you have some problem with your program
-            and send me the error
-]]
+local quitBtn = ui.Button("Quit")
+quitBtn.x = frame.width - 6
+quitBtn.y = frame.height - 1
+quitBtn.width = 6
+quitBtn.backgroundColor = colors.red
+quitBtn.onClick = function()
+    screen:stop()
+end
+frame:addChild(quitBtn)
 
--- local success, err = pcall(function()
-    -- your existing code here
-    ui.HandleInput()
--- end)
-
--- if not success then
-    -- print("Error occurred: " .. err)
--- end
+-- Start the framework loop
+screen:run()
