@@ -72,10 +72,11 @@ end
 function Screen:stop()
     self.running = false
     -- Leaving the cursor at the bottom means the shell prompt won't paint over the last UI row
-    local _, sh = self.target.getSize()
-    self.target.setCursorPos(1, sh)
+    self.target.setBackgroundColor(colors.black)
+    self.target.setTextColor(colors.white)
+    self.target.clear()
+    self.target.setCursorPos(1, 1)
     self.target.setCursorBlink(false)
-    print()
 end
 
 return Screen
