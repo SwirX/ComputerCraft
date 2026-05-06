@@ -1,5 +1,5 @@
 local Net = require("net")
-local ui = require("sxui.ui")
+local ui = require("lib.sxui.ui")
 
 if not Net.init() then
     print("Error: No rednet modem found on this dashboard.")
