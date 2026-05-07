@@ -8,12 +8,11 @@ local ui                     = require("lib.sxui.ui")
 local dfpwm                  = require("cc.audio.dfpwm")
 
 local MUSICLO_API            = "https://ipod-2to6magyna-uc.a.run.app/"
-local BACKEND_API            = "http://minecraft.bouyakhsass.com:3000"
+local BACKEND_API            = "https://minecraft.bouyakhsass.com"
 local REDNET_PROTOCOL        = "sx-music"
 local REDNET_HOSTNAME        = "sx-music-host"
-local RADIO_REFILL_THRESHOLD = 3 -- fetch related when queue drops to this many songs
+local RADIO_REFILL_THRESHOLD = 3
 
--- ─── Hardware detection ────────────────────────────────────────────────────
 local localSpeakers          = { peripheral.find("speaker") }
 local modem                  = peripheral.find("modem")
 
@@ -26,7 +25,6 @@ if modem then
     rednet.host(REDNET_PROTOCOL, REDNET_HOSTNAME)
 end
 
--- ─── State ─────────────────────────────────────────────────────────────────
 local state = {
     nowPlaying         = nil,
     queue              = {},
@@ -38,7 +36,6 @@ local state = {
     currentPage        = "home",
     needsRedraw        = false,
 
-    -- Audio stream state: "idle"|"fetching"|"streaming"|"waiting_buffer"|"song_ended"
     streamPhase        = "idle",
     playerHandle       = nil,
     dfpwmDecoder       = nil,
@@ -46,17 +43,14 @@ local state = {
     chunkSize          = 16 * 1024 - 4,
     headerRemainder    = nil,
 
-    -- HTTP request tracking
     pendingSearchUrl   = nil,
     pendingDownloadUrl = nil,
     pendingFeaturedUrl = nil,
     pendingRelatedUrl  = nil,
 
-    -- Rednet speaker nodes: key = computerId, value = os.clock() last seen
     speakerNodes       = {},
 }
 
--- ─── Palette ───────────────────────────────────────────────────────────────
 local COLOR_ORDER = {
     colors.white, colors.orange, colors.magenta, colors.lightBlue,
     colors.yellow, colors.lime, colors.pink, colors.gray,
@@ -80,7 +74,6 @@ local function restorePalette()
     for i, c in ipairs(COLOR_ORDER) do term.setPaletteColor(c, table.unpack(savedPalette[i])) end
 end
 
--- ─── Helpers ───────────────────────────────────────────────────────────────
 local function truncate(text, maxLen)
     if not text or maxLen <= 0 then return "" end
     if #text <= maxLen then return text end
@@ -100,7 +93,6 @@ local function nodeCount()
     return n
 end
 
--- ─── Rednet broadcast ──────────────────────────────────────────────────────
 local function broadcastToNodes(message)
     if not modem then return end
     for computerId in pairs(state.speakerNodes) do
@@ -108,7 +100,6 @@ local function broadcastToNodes(message)
     end
 end
 
--- ─── Playback control ──────────────────────────────────────────────────────
 local function stopCurrentStream()
     state.isPlaying       = false
     state.streamPhase     = "idle"
@@ -131,7 +122,6 @@ local function playSong(song)
     http.request({ url = url, binary = true })
     broadcastToNodes({ type = "play", url = url })
 
-    -- Auto-refill the radio queue when it's running low
     if #state.queue <= RADIO_REFILL_THRESHOLD then
         state.pendingRelatedUrl = BACKEND_API .. "/related?id=" .. textutils.urlEncode(song.id)
         http.request(state.pendingRelatedUrl)
@@ -176,10 +166,6 @@ local function fetchFeatured()
     http.request(state.pendingFeaturedUrl)
 end
 
--- ─── Audio loop ────────────────────────────────────────────────────────────
--- Reads DFPWM chunks from the open HTTP stream and feeds local speakers.
--- If there are no local speakers we pace ourselves with a sleep so we do not
--- drain the stream instantly and can still track song-end timing.
 local hasLocalSpeakers = #localSpeakers > 0
 
 local function audioLoop()
@@ -187,7 +173,6 @@ local function audioLoop()
         sleep(0.05)
 
         if state.streamPhase == "streaming" and state.isPlaying then
-            -- Retry a buffered chunk that was rejected last tick
             if state.audioBuffer then
                 if hasLocalSpeakers then
                     local ok = true
@@ -200,12 +185,10 @@ local function audioLoop()
                         state.streamPhase = "waiting_buffer"
                     end
                 else
-                    -- No local speaker: discard buffered chunk, timing is by sleep below
                     state.audioBuffer = nil
                 end
             end
 
-            -- Read and play the next chunk
             if state.streamPhase == "streaming" and not state.audioBuffer then
                 local raw = state.playerHandle.read(state.chunkSize)
 
@@ -231,7 +214,6 @@ local function audioLoop()
                             state.streamPhase = "waiting_buffer"
                         end
                     else
-                        -- Pace by chunk duration: bytes * 8 bits / 48000 samples per second
                         sleep(math.max(#raw * 8 / 48000 - 0.05, 0))
                     end
                 end
@@ -250,7 +232,6 @@ local function audioLoop()
     end
 end
 
--- ─── HTTP + speaker event loop ─────────────────────────────────────────────
 local function httpEventLoop()
     while true do
         local event, p1, p2 = os.pullEvent()
@@ -326,7 +307,6 @@ local function httpEventLoop()
     end
 end
 
--- ─── Rednet loop ───────────────────────────────────────────────────────────
 local function rednetLoop()
     if not modem then return end
     while true do
@@ -342,10 +322,6 @@ local function rednetLoop()
     end
 end
 
--- ─── UI helpers ────────────────────────────────────────────────────────────
--- Layout adapts to the terminal size on every screen rebuild.
--- Compact mode is anything 30 chars or narrower (pocket computers).
-
 local function buildNowPlayingBar(screen, W)
     local bar            = ui.Element()
     bar.position.offsetX = 1
@@ -355,8 +331,7 @@ local function buildNowPlayingBar(screen, W)
     bar.backgroundColor  = colors.gray
     screen:addChild(bar)
 
-    -- Title + artist combined, leaving room for three right-side buttons
-    local buttonZoneWidth = 14 -- " || " + " >> " + " LP "
+    local buttonZoneWidth = 14
     local textWidth       = W - buttonZoneWidth - 1
     local displayText
 
@@ -389,7 +364,6 @@ local function buildNowPlayingBar(screen, W)
         screen:addChild(btn)
     end
 
-    -- Buttons from right: [LP/--][>>][ || / |> ]
     addBarBtn(state.isLooping and " LP" or " --", 3,
         state.isLooping and colors.green or colors.gray,
         function()
@@ -428,9 +402,6 @@ local function buildTabBar(screen, W)
     end
 end
 
--- Builds a song card inside a scroll panel.
--- Compact layout (narrow screen): 3-line card, buttons on line 1 right edge.
--- Normal layout: 2-line title/artist, buttons on line 1 right edge.
 local function buildSongCard(parent, song, cardY, rowWidth, isCompact, onPlay, onQueueToggle)
     local cardHeight      = isCompact and 2 or 3
 
@@ -442,10 +413,8 @@ local function buildSongCard(parent, song, cardY, rowWidth, isCompact, onPlay, o
     card.backgroundColor  = colors.gray
     parent:addChild(card)
 
-    -- Buttons occupy right 10 chars: [Play][ +Q] or [ P][-Q]
     local btnWidth             = isCompact and 3 or 5
-    local btnGap               = 1
-    local btnZone              = btnWidth * 2 + btnGap
+    local btnZone              = btnWidth * 2 + 1
     local textWidth            = rowWidth - btnZone - 2
 
     local titleLine            = ui.Label(truncate(song.name, textWidth))
@@ -510,7 +479,6 @@ local function buildHomePage(screen, W, H)
     sp:addChild(hdr)
 
     local cardHeight = isCompact and 2 or 3
-    local cardGap    = 1
     local rowY       = 2
     for _, song in ipairs(state.featuredList) do
         local s = song
@@ -530,14 +498,13 @@ local function buildHomePage(screen, W, H)
                 end
                 screen:stop()
             end)
-        rowY = rowY + cardHeight + cardGap
+        rowY = rowY + cardHeight + 1
     end
 end
 
-local function buildSearchPage(screen, W, H)
+local function buildSearchPage(screen, W, H, searchInput)
     local isCompact          = W <= 30
 
-    -- Search input row
     local inputBg            = ui.Element()
     inputBg.position.offsetX = 1
     inputBg.position.offsetY = 3
@@ -546,7 +513,6 @@ local function buildSearchPage(screen, W, H)
     inputBg.backgroundColor  = colors.gray
     screen:addChild(inputBg)
 
-    local searchInput            = ui.Input()
     searchInput.position.offsetX = 2
     searchInput.position.offsetY = 3
     searchInput.size.offsetX     = W - 9
@@ -584,7 +550,6 @@ local function buildSearchPage(screen, W, H)
     end
     screen:addChild(goBtn)
 
-    -- Results scroll panel
     local contentY      = 4
     local sp            = ui.ScrollPanel()
     sp.position.offsetX = 1
@@ -610,7 +575,7 @@ local function buildSearchPage(screen, W, H)
         sp:addChild(lbl)
     elseif state.searchResults then
         local cardHeight = isCompact and 2 or 3
-        local rowY = 1
+        local rowY       = 1
         for _, song in ipairs(state.searchResults) do
             local s = song
             buildSongCard(sp, song, rowY, W - 1, isCompact,
@@ -657,7 +622,7 @@ local function buildQueuePage(screen, W, H)
     end
 
     local cardHeight = isCompact and 2 or 3
-    local rowY = 1
+    local rowY       = 1
 
     for i, song in ipairs(state.queue) do
         local idx             = i
@@ -706,8 +671,7 @@ local function buildQueuePage(screen, W, H)
         playBtn.foregroundColor  = colors.white
         playBtn.pressedColor     = colors.lightGray
         playBtn.onClick          = function()
-            local picked = table.remove(state.queue, idx)
-            playSong(picked)
+            playSong(table.remove(state.queue, idx))
             state.currentPage = "home"
             screen:stop()
         end
@@ -722,8 +686,7 @@ local function buildQueuePage(screen, W, H)
         removeBtn.foregroundColor  = colors.lightGray
         removeBtn.pressedColor     = colors.lightGray
         removeBtn.onClick          = function()
-            removeFromQueue(idx)
-            screen:stop()
+            removeFromQueue(idx); screen:stop()
         end
         card:addChild(removeBtn)
 
@@ -737,25 +700,30 @@ local function buildScreen()
     local screen              = ui.Screen()
     screen.backgroundColor    = colors.black
 
-    -- Global key shortcuts intercepted before any child widget sees the event.
-    -- The S/Q/H shortcuts are suppressed while the search input is focused to
-    -- let the user type those letters normally in the search box.
+    -- searchInput is hoisted here so the key handler closure can check its focus
+    -- state without needing to reach into buildSearchPage's locals
+    local searchInput         = ui.Input()
+
     local originalHandleEvent = screen.handleEvent
     screen.handleEvent        = function(self, event, p1, p2, p3)
         if event == "key" then
-            local k = p1
-            if k == keys.space then
-                togglePlayPause(); screen:stop(); return true
-            elseif k == keys.n then
-                skipToNext(); screen:stop(); return true
-            elseif k == keys.l then
-                toggleLoop(); screen:stop(); return true
-            elseif (k == keys.s or k == keys.tab) and state.currentPage ~= "search" then
-                state.currentPage = "search"; screen:stop(); return true
-            elseif k == keys.q and state.currentPage ~= "search" then
-                state.currentPage = "queue"; screen:stop(); return true
-            elseif k == keys.h and state.currentPage ~= "search" then
-                state.currentPage = "home"; screen:stop(); return true
+            local k                  = p1
+            local searchInputFocused = state.currentPage == "search" and searchInput.isFocused
+
+            if not searchInputFocused then
+                if k == keys.space then
+                    togglePlayPause(); screen:stop(); return true
+                elseif k == keys.n then
+                    skipToNext(); screen:stop(); return true
+                elseif k == keys.l then
+                    toggleLoop(); screen:stop(); return true
+                elseif k == keys.s or k == keys.tab then
+                    state.currentPage = "search"; screen:stop(); return true
+                elseif k == keys.q then
+                    state.currentPage = "queue"; screen:stop(); return true
+                elseif k == keys.h then
+                    state.currentPage = "home"; screen:stop(); return true
+                end
             end
         end
         return originalHandleEvent(self, event, p1, p2, p3)
@@ -767,7 +735,7 @@ local function buildScreen()
     if state.currentPage == "home" then
         buildHomePage(screen, W, H)
     elseif state.currentPage == "search" then
-        buildSearchPage(screen, W, H)
+        buildSearchPage(screen, W, H, searchInput)
     elseif state.currentPage == "queue" then
         buildQueuePage(screen, W, H)
     end
@@ -775,16 +743,13 @@ local function buildScreen()
     return screen
 end
 
--- ─── UI loop ───────────────────────────────────────────────────────────────
 local function uiLoop()
     while true do
         state.needsRedraw = false
-        local screen = buildScreen()
+        local screen      = buildScreen()
 
-        -- Extend Screen:run to also stop on our internal redraw event so the
-        -- audio and HTTP coroutines can trigger a UI refresh without a click.
-        local base = screen.run
-        screen.run = function(self)
+        local base        = screen.run
+        screen.run        = function(self)
             self.running = true
             self:draw()
             while self.running do
@@ -818,7 +783,6 @@ local function redrawWatcher()
     end
 end
 
--- ─── Entry point ───────────────────────────────────────────────────────────
 applyYTMPalette()
 fetchFeatured()
 
