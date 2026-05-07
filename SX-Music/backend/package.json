@@ -1,0 +1,17 @@
+{
+    "name": "sx-music-featured",
+    "version": "1.0.0",
+    "description": "Featured tracks endpoint for SX-Music CC:Tweaked player",
+    "main": "featured.js",
+    "scripts": {
+        "start": "node featured.js",
+        "dev": "node --watch featured.js"
+    },
+    "dependencies": {
+        "express": "^4.19.2",
+        "ytmusic-api": "^5.1.0"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}
