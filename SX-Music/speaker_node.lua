@@ -30,7 +30,25 @@ local stream = {
     chunkSize       = 16 * 1024 - 4,
     headerRemainder = nil,
     pendingUrl      = nil,
+    name            = nil,
+    artist          = nil,
 }
+
+local function drawStatus()
+    term.clear()
+    local w, h = term.getSize()
+    local cy = math.floor(h / 2)
+    local function printCentered(y, txt)
+        if not txt then return end
+        local tx = math.floor((w - #tostring(txt)) / 2) + 1
+        term.setCursorPos(tx, y)
+        term.write(tostring(txt))
+    end
+    printCentered(cy - 2, "SX-Music Node")
+    printCentered(cy, "[" .. stream.phase .. "]")
+    if stream.name then printCentered(cy + 2, stream.name) end
+    if stream.artist then printCentered(cy + 3, stream.artist) end
+end
 
 local function resetStream()
     stream.phase           = "idle"
@@ -43,11 +61,14 @@ local function resetStream()
     speaker.stop()
 end
 
-local function startStream(url)
+local function startStream(url, name, artist)
     resetStream()
     stream.phase      = "fetching"
     stream.pendingUrl = url
+    stream.name       = name
+    stream.artist     = artist
     http.request({ url = url, binary = true })
+    drawStatus()
 end
 
 local function audioLoop()
@@ -70,6 +91,7 @@ local function audioLoop()
                     stream.playerHandle.close()
                     stream.playerHandle = nil
                     stream.phase = "idle"
+                    drawStatus()
                 else
                     if stream.headerRemainder then
                         rawChunk               = stream.headerRemainder .. rawChunk
@@ -127,10 +149,12 @@ local function eventLoop()
                 stream.dfpwmDecoder    = dfpwm.make_decoder()
                 stream.phase           = "streaming"
             end
+            drawStatus()
         end
 
         if event == "http_failure" and stream.phase == "fetching" then
             stream.phase = "idle"
+            drawStatus()
         end
 
         if event == "rednet_message" then
@@ -151,7 +175,7 @@ local function eventLoop()
                     rednet.broadcast(message, REDNET_PROTOCOL)
 
                     if message.type == "play" and type(message.url) == "string" then
-                        startStream(message.url)
+                        startStream(message.url, message.name, message.artist)
                     elseif message.type == "stop" then
                         resetStream()
                     elseif message.type == "ping" then
@@ -200,4 +224,5 @@ else
     rednet.broadcast(initMsg, REDNET_PROTOCOL)
 end
 
+drawStatus()
 parallel.waitForAny(audioLoop, eventLoop, heartbeatLoop)

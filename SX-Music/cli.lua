@@ -114,7 +114,7 @@ local function playSong(song)
     local url = MUSICLO_API .. "?v=2&id=" .. textutils.urlEncode(song.id)
     state.pendingDownloadUrl = url
     http.request({ url = url, binary = true })
-    broadcastToNodes({ type = "play", url = url })
+    broadcastToNodes({ type = "play", url = url, name = song.name or song.title, artist = song.artist })
 
     if #state.queue <= RADIO_REFILL_THRESHOLD then
         state.pendingRelatedUrl = BACKEND_API .. "/related?id=" .. textutils.urlEncode(song.id)

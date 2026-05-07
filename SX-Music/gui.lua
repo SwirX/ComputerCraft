@@ -131,7 +131,7 @@ local function playSong(song)
     local url                = MUSICLO_API .. "?v=2&id=" .. textutils.urlEncode(song.id)
     state.pendingDownloadUrl = url
     http.request({ url = url, binary = true })
-    broadcastToNodes({ type = "play", url = url })
+    broadcastToNodes({ type = "play", url = url, name = song.name or song.title, artist = song.artist })
 
     if #state.queue <= RADIO_REFILL_THRESHOLD then
         state.pendingRelatedUrl = BACKEND_API .. "/related?id=" .. textutils.urlEncode(song.id)
@@ -191,8 +191,13 @@ local function loadLastSong()
     end
 
     if not song then
-        song = { id = "dQw4w9WgXcQ", name = "Never Gonna Give You Up", title = "Never Gonna Give You Up", artist =
-        "Rick Astley" }
+        song = {
+            id = "dQw4w9WgXcQ",
+            name = "Never Gonna Give You Up",
+            title = "Never Gonna Give You Up",
+            artist =
+            "Rick Astley"
+        }
     end
 
     state.featuredList = { song }
