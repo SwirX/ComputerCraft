@@ -139,7 +139,7 @@ local function eventLoop()
                 -- Message Deduplication for Relay
                 local sig = message.msgID
                 if not sig then
-                    sig = message.type .. (message.url or "") .. senderId
+                    sig = tostring(message.type or "unknown") .. tostring(message.url or "") .. tostring(senderId)
                 end
 
                 if seenMessages[sig] then
