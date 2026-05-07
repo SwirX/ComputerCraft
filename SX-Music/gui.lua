@@ -1,5 +1,5 @@
 -- Bootstrap SX-UI package path before any require calls
-local sxuiPath = "/lib/sxui/?.lua"
+local sxuiPath = "/;/lib/sxui/?.lua"
 if not package.path:find(sxuiPath, 1, true) then
     package.path = package.path .. ";" .. sxuiPath
 end
@@ -8,7 +8,7 @@ local ui                     = require("lib.sxui.ui")
 local dfpwm                  = require("cc.audio.dfpwm")
 
 local MUSICLO_API            = "https://ipod-2to6magyna-uc.a.run.app/"
-local BACKEND_API            = "https://minecraft.bouyakhsass.com"
+local BACKEND_API            = "http://minecraft.bouyakhsass.com:3000"
 local REDNET_PROTOCOL        = "sx-music"
 local REDNET_HOSTNAME        = "sx-music-host"
 local RADIO_REFILL_THRESHOLD = 3
