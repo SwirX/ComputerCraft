@@ -4,7 +4,7 @@ if not package.path:find(sxuiPath, 1, true) then
     package.path = package.path .. ";" .. sxuiPath
 end
 
-local ui                     = require("lib.sxui.ui")
+local ui                     = require("ui")
 local dfpwm                  = require("cc.audio.dfpwm")
 
 local MUSICLO_API            = "https://ipod-2to6magyna-uc.a.run.app/"
