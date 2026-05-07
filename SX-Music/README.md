@@ -13,6 +13,8 @@ A YouTube Music player. Streams audio directly to an in-game speaker using the D
 - YouTube Music dark theme applied to the CC terminal palette
 - Supports multiple speakers for stereo/multi-speaker setups
 - Install script that sets everything up in one command
+- Wireless Speaker Nodes that repeat and relay your broadcasts remotely
+- CLI and GUI variants for usage on Advanced and Standard CC peripherals
 
 ---
 
@@ -33,14 +35,15 @@ Run this inside a CC computer with internet access:
 wget run https://raw.githubusercontent.com/SwirX/ComputerCraft/main/SX-Music/install.lua
 ```
 
-That downloads SX-UI into `/lib/sxui/` and the player to `/music`. After that just run:
+The installer will prompt you to choose whether you are installing the main player or establishing a Speaker Node. 
 
+If you install the main player, it will download the required UI frameworks and place the launcher at `/music`. Execute the program by typing:
 ```
 music
 ```
 
 ---
-lose you drake
+
 ## Controls
 
 | Key | Action |
@@ -54,6 +57,16 @@ lose you drake
 | Enter | Submit search or play selected song |
 
 Mouse clicks work on Advanced Computers. Every action is also reachable by keyboard so it runs fine on standard computers.
+
+---
+
+## Wireless Speaker Nodes and Relays
+
+Any standard computer with a modem and a speaker can act as a Speaker Node. When running `music` on your host computer, remote Speaker Nodes will intercept its broadcast and seamlessly mirror the audio stream across the world. 
+
+To deploy a node, simply run the installer script on a new computer and choose option `2. Speaker Node`. This saves the node logic immediately to `/startup.lua`. Connect a modem and speaker, reboot the computer, and the node will begin listening for the host. 
+
+**Relay Features**: If an active Speaker Node is geographically distant from the host computer, it will automatically act as a repeater. Once it receives a broadcast, it caches the unique identifier and rebroadcasts the signal outwards to other nodes that may be entirely out of range of the origin server.
 
 ---
 

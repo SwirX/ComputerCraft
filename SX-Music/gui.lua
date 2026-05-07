@@ -33,6 +33,7 @@ local state = {
     searchQuery        = "",
     isPlaying          = false,
     isLooping          = false,
+    isRandom           = false,
     currentPage        = "home",
     needsRedraw        = false,
 
@@ -100,6 +101,15 @@ local function broadcastToNodes(message)
     end
 end
 
+local function saveLastSong()
+    if state.nowPlaying then
+        local f = fs.open(".last_song", "w")
+        if f then
+            f.write(textutils.serialiseJSON(state.nowPlaying)); f.close()
+        end
+    end
+end
+
 local function stopCurrentStream()
     state.isPlaying       = false
     state.streamPhase     = "idle"
@@ -113,9 +123,10 @@ end
 
 local function playSong(song)
     stopCurrentStream()
-    state.nowPlaying         = song
-    state.isPlaying          = true
-    state.streamPhase        = "fetching"
+    state.nowPlaying  = song
+    state.isPlaying   = true
+    state.streamPhase = "fetching"
+    saveLastSong()
 
     local url                = MUSICLO_API .. "?v=2&id=" .. textutils.urlEncode(song.id)
     state.pendingDownloadUrl = url
@@ -130,7 +141,11 @@ end
 
 local function skipToNext()
     if #state.queue > 0 then
-        playSong(table.remove(state.queue, 1))
+        local nextIdx = 1
+        if state.isRandom and #state.queue > 1 then
+            nextIdx = math.random(1, #state.queue)
+        end
+        playSong(table.remove(state.queue, nextIdx))
     else
         stopCurrentStream()
         state.nowPlaying = nil
@@ -161,9 +176,34 @@ local function searchYoutube(query)
     http.request(state.pendingSearchUrl)
 end
 
-local function fetchFeatured()
-    state.pendingFeaturedUrl = BACKEND_API .. "/featured"
-    http.request(state.pendingFeaturedUrl)
+local function loadLastSong()
+    local song = nil
+    if fs.exists(".last_song") then
+        local f = fs.open(".last_song", "r")
+        if f then
+            local raw = f.readAll()
+            f.close()
+            local ok, parsed = pcall(textutils.unserialiseJSON, raw)
+            if ok and type(parsed) == "table" and parsed.id then
+                song = parsed
+            end
+        end
+    end
+
+    if not song then
+        song = { id = "dQw4w9WgXcQ", name = "Never Gonna Give You Up", title = "Never Gonna Give You Up", artist =
+        "Rick Astley" }
+    end
+
+    state.featuredList = { song }
+    state.pendingRelatedUrl = BACKEND_API .. "/related?id=" .. textutils.urlEncode(song.id)
+    http.request(state.pendingRelatedUrl)
+    state.queue = {}
+    playSong(song)
+end
+
+local function toggleRandom()
+    state.isRandom = not state.isRandom
 end
 
 local hasLocalSpeakers = #localSpeakers > 0
@@ -192,7 +232,7 @@ local function audioLoop()
             if state.streamPhase == "streaming" and not state.audioBuffer then
                 local raw = state.playerHandle.read(state.chunkSize)
 
-                if not raw then
+                if not raw or #raw == 0 then
                     state.playerHandle.close()
                     state.playerHandle = nil
                     state.streamPhase  = "song_ended"
@@ -270,25 +310,28 @@ local function httpEventLoop()
             elseif url == state.pendingSearchUrl then
                 local raw = textutils.unserialiseJSON(handle.readAll())
                 handle.close()
-                if raw and #raw > 1 then table.remove(raw, 1) end
-                state.searchResults = raw or {}
-                state.needsRedraw   = true
-            elseif url == state.pendingFeaturedUrl then
-                local raw = textutils.unserialiseJSON(handle.readAll())
-                handle.close()
+                local parsed = {}
                 for _, track in ipairs(raw or {}) do
-                    track.name = track.title
+                    if track.id and (track.title or track.name) then
+                        table.insert(parsed, track)
+                    end
                 end
-                state.featuredList = raw or {}
-                state.needsRedraw  = true
+                state.searchResults = parsed
+                state.needsRedraw   = true
             elseif url == state.pendingRelatedUrl then
                 local raw = textutils.unserialiseJSON(handle.readAll())
                 handle.close()
+
+                state.featuredList = {}
                 for _, track in ipairs(raw or {}) do
                     track.name = track.title
+                    table.insert(state.featuredList, track)
                     if not songInQueue(track) then
                         table.insert(state.queue, track)
                     end
+                end
+                while #state.featuredList > 10 do
+                    table.remove(state.featuredList)
                 end
                 state.needsRedraw = true
             end
@@ -372,12 +415,18 @@ local function buildNowPlayingBar(screen, W)
             toggleLoop(); screen:stop()
         end)
 
-    addBarBtn(" >>", 7, colors.gray,
+    addBarBtn(state.isRandom and " RN" or " --", 7,
+        state.isRandom and colors.green or colors.gray,
+        function()
+            toggleRandom(); screen:stop()
+        end)
+
+    addBarBtn(" >>", 11, colors.gray,
         function()
             skipToNext(); screen:stop()
         end)
 
-    addBarBtn(state.isPlaying and " ||" or " |>", 11,
+    addBarBtn(state.isPlaying and " ||" or " |>", 15,
         state.isPlaying and colors.red or colors.green,
         function()
             togglePlayPause(); screen:stop()
@@ -404,7 +453,14 @@ local function buildTabBar(screen, W)
     end
 end
 
-local function buildSongCard(parent, song, cardY, rowWidth, isCompact, onPlay, onQueueToggle)
+local function formatListItemName(idx, name)
+    if not term.isColor() and idx then
+        return idx .. ". " .. (name or "")
+    end
+    return name or ""
+end
+
+local function buildSongCard(parent, song, cardY, rowWidth, isCompact, onPlay, onQueueToggle, drawIdx)
     local cardHeight      = isCompact and 2 or 3
 
     local card            = ui.Element()
@@ -419,7 +475,8 @@ local function buildSongCard(parent, song, cardY, rowWidth, isCompact, onPlay, o
     local btnZone              = btnWidth * 2 + 1
     local textWidth            = rowWidth - btnZone - 2
 
-    local titleLine            = ui.Label(truncate(song.name, textWidth))
+    local displayTitle         = formatListItemName(drawIdx, song.name)
+    local titleLine            = ui.Label(truncate(displayTitle, textWidth))
     titleLine.position.offsetX = 2
     titleLine.position.offsetY = 1
     titleLine.size.offsetX     = textWidth
@@ -482,7 +539,7 @@ local function buildHomePage(screen, W, H)
 
     local cardHeight = isCompact and 2 or 3
     local rowY       = 2
-    for _, song in ipairs(state.featuredList) do
+    for i, song in ipairs(state.featuredList) do
         local s = song
         buildSongCard(sp, song, rowY, W - 1, isCompact,
             function()
@@ -499,7 +556,7 @@ local function buildHomePage(screen, W, H)
                     addToQueue(s)
                 end
                 screen:stop()
-            end)
+            end, i)
         rowY = rowY + cardHeight + 1
     end
 end
@@ -578,7 +635,7 @@ local function buildSearchPage(screen, W, H, searchInput)
     elseif state.searchResults then
         local cardHeight = isCompact and 2 or 3
         local rowY       = 1
-        for _, song in ipairs(state.searchResults) do
+        for i, song in ipairs(state.searchResults) do
             local s = song
             buildSongCard(sp, song, rowY, W - 1, isCompact,
                 function()
@@ -595,7 +652,7 @@ local function buildSearchPage(screen, W, H, searchInput)
                         addToQueue(s)
                     end
                     screen:stop()
-                end)
+                end, i)
             rowY = rowY + cardHeight + 1
         end
     end
@@ -786,7 +843,7 @@ local function redrawWatcher()
 end
 
 applyYTMPalette()
-fetchFeatured()
+loadLastSong()
 
 local ok, err = pcall(function()
     parallel.waitForAny(audioLoop, httpEventLoop, rednetLoop, uiLoop, redrawWatcher)

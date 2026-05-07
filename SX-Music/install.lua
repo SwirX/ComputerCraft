@@ -3,6 +3,53 @@ local REPO_NAME   = "ComputerCraft"
 local REPO_BRANCH = "main"
 local RAW_BASE    = "https://raw.githubusercontent.com/" .. REPO_USER .. "/" .. REPO_NAME .. "/" .. REPO_BRANCH
 
+local function makeDir(path)
+    if not fs.exists(path) then fs.makeDir(path) end
+end
+
+local function downloadTo(url, destPath)
+    write("  " .. destPath .. "... ")
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        local file = fs.open(destPath, "w")
+        file.write(content)
+        file.close()
+        print("ok")
+        return true
+    else
+        print("FAILED")
+        return false
+    end
+end
+
+print("SX-Music installer")
+print("")
+print("What do you want to install?")
+print("1. Main App (GUI/CLI Player)")
+print("2. Speaker Node (Wireless relay/speaker extension)")
+write("Enter choice (1/2): ")
+local mainChoice = read()
+
+local failed = 0
+
+if mainChoice == "2" then
+    print("")
+    print("Installing Speaker Node to /startup.lua...")
+    if not downloadTo(RAW_BASE .. "/SX-Music/speaker_node.lua", "/startup.lua") then
+        failed = failed + 1
+    end
+    print("")
+    if failed == 0 then
+        print("Done. Please attach a modem and a speaker, then reboot.")
+    else
+        print("Failed to download. Check connection.")
+    end
+    return
+end
+
+print("")
 print("Installing SX-UI framework dependency...")
 local sxuiUrl = RAW_BASE .. "/SX-UI/install.lua"
 if shell then

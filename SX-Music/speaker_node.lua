@@ -88,8 +88,20 @@ local function audioLoop()
     end
 end
 
+local seenMessages = {}
+
 local function eventLoop()
     while true do
+        -- Clean up old seen messages randomly to prevent memory leaks
+        if math.random(1, 100) == 1 then
+            local now = os.clock()
+            for id, time in pairs(seenMessages) do
+                if now - time > 60 then
+                    seenMessages[id] = nil
+                end
+            end
+        end
+
         local event, p1, p2 = os.pullEvent()
 
         if event == "speaker_audio_empty" and stream.phase == "waiting_buffer" then
@@ -124,12 +136,27 @@ local function eventLoop()
         if event == "rednet_message" then
             local senderId, message = p1, p2
             if type(message) == "table" then
-                if message.type == "play" and type(message.url) == "string" then
-                    startStream(message.url)
-                elseif message.type == "stop" then
-                    resetStream()
-                elseif message.type == "ping" then
-                    rednet.send(senderId, { type = "pong" }, REDNET_PROTOCOL)
+                -- Message Deduplication for Relay
+                local sig = message.msgID
+                if not sig then
+                    sig = message.type .. (message.url or "") .. senderId
+                end
+
+                if seenMessages[sig] then
+                    -- Already processed this broadcast
+                else
+                    seenMessages[sig] = os.clock()
+
+                    -- Relay it forward to other distant nodes
+                    rednet.broadcast(message, REDNET_PROTOCOL)
+
+                    if message.type == "play" and type(message.url) == "string" then
+                        startStream(message.url)
+                    elseif message.type == "stop" then
+                        resetStream()
+                    elseif message.type == "ping" then
+                        rednet.send(senderId, { type = "pong" }, REDNET_PROTOCOL)
+                    end
                 end
             end
         end
@@ -141,8 +168,17 @@ end
 local function heartbeatLoop()
     while true do
         local hostId = rednet.lookup(REDNET_PROTOCOL, "sx-music-host")
+        local msg = {
+            type = "register",
+            originalNode = os.getComputerID(),
+            msgID = os.getComputerID() .. "_reg_" .. tostring(os.clock())
+        }
+
         if hostId then
-            rednet.send(hostId, { type = "register" }, REDNET_PROTOCOL)
+            rednet.send(hostId, msg, REDNET_PROTOCOL)
+        else
+            -- If host is far away, broadcast so other nodes relay it
+            rednet.broadcast(msg, REDNET_PROTOCOL)
         end
         sleep(HEARTBEAT_INTERVAL)
     end
@@ -150,11 +186,18 @@ end
 
 -- Initial registration attempt
 local hostId = rednet.lookup(REDNET_PROTOCOL, "sx-music-host")
+local initMsg = {
+    type = "register",
+    originalNode = os.getComputerID(),
+    msgID = os.getComputerID() .. "_reg_" .. tostring(os.clock())
+}
+
 if hostId then
     print("Connected to SX-Music host " .. hostId)
-    rednet.send(hostId, { type = "register" }, REDNET_PROTOCOL)
+    rednet.send(hostId, initMsg, REDNET_PROTOCOL)
 else
-    print("Host not found yet. Will keep trying via heartbeat.")
+    print("Host not found directly. Broadcasting register via relays.")
+    rednet.broadcast(initMsg, REDNET_PROTOCOL)
 end
 
 parallel.waitForAny(audioLoop, eventLoop, heartbeatLoop)
