@@ -1,4 +1,4 @@
-local ui = require("lib.sxui.ui")
+local ui = require("ui")
 
 -- Mega-test showing every widget in a multi-window layout.
 -- Two draggable AppWindows are placed on screen. Each demonstrates different widgets.

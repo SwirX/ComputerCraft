@@ -1,9 +1,4 @@
--- Bootstrap SX-UI package path before any require calls
-local sxuiPath = "/;/lib/sxui/?.lua"
-if not package.path:find(sxuiPath, 1, true) then
-    package.path = package.path .. ";" .. sxuiPath
-end
-
+-- SX-UI path is bootstrapped by /startup.lua
 local ui                     = require("ui")
 local dfpwm                  = require("cc.audio.dfpwm")
 

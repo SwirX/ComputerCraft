@@ -1,5 +1,5 @@
-local class = require("lib.sxui.core.class")
-local Element = require("lib.sxui.core.element")
+local class = require("core.class")
+local Element = require("core.element")
 
 local Checkbox = class(Element)
 

@@ -1,5 +1,5 @@
-local class = require("lib.sxui.core.class")
-local Element = require("lib.sxui.core.element")
+local class = require("core.class")
+local Element = require("core.element")
 
 -- We handle drag exclusively from the titlebar rather than the whole frame body,
 -- so draggable is intentionally left false on the base Element.

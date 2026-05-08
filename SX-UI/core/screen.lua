@@ -1,6 +1,6 @@
-local class = require("lib.sxui.core.class")
-local Element = require("lib.sxui.core.element")
-local Animator = require("lib.sxui.core.animator")
+local class = require("core.class")
+local Element = require("core.element")
+local Animator = require("core.animator")
 
 local Screen = class(Element)
 

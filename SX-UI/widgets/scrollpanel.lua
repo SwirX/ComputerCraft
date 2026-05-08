@@ -1,5 +1,5 @@
-local class = require("lib.sxui.core.class")
-local Element = require("lib.sxui.core.element")
+local class = require("core.class")
+local Element = require("core.element")
 
 -- We use window.create() for real terminal-level clipping instead of manually
 -- checking bounds on every child draw call. This is the only correct way to clip in CC.

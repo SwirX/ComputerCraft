@@ -1,5 +1,5 @@
-local class = require("lib.sxui.core.class")
-local Element = require("lib.sxui.core.element")
+local class = require("core.class")
+local Element = require("core.element")
 
 local TextEdit = class(Element)
 
@@ -80,7 +80,7 @@ function TextEdit:handleEvent(event, p1, p2, p3)
                 if self.cursorCol > 1 then
                     local line = self.lines[self.cursorLine]
                     self.lines[self.cursorLine] = string.sub(line, 1, self.cursorCol - 2) ..
-                    string.sub(line, self.cursorCol)
+                        string.sub(line, self.cursorCol)
                     self.cursorCol = self.cursorCol - 1
                 elseif self.cursorLine > 1 then
                     local prevLine = self.lines[self.cursorLine - 1]

@@ -53,4 +53,4 @@ for _, path in ipairs(FILES) do
 end
 
 print("Installed to " .. INSTALL_DIR)
-print('Usage: local ui = require("lib.sxui.ui")')
+print('Usage: local ui = require("ui")')

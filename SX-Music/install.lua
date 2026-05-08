@@ -114,6 +114,33 @@ if pf then
 end
 
 print("")
+print("Setting up SX-UI library path in /startup.lua...")
+local startupBootstrapper = [[
+local sxuiPath = "/lib/sxui/?.lua"
+if not package.path:find(sxuiPath, 1, true) then
+    package.path = package.path .. ";" .. sxuiPath
+end
+]]
+local hasInjection = false
+if fs.exists("/startup.lua") then
+    local f = fs.open("/startup.lua", "r")
+    local content = f.readAll() or ""
+    f.close()
+    if content:find("/lib/sxui/?.lua", 1, true) then
+        hasInjection = true
+    end
+end
+if not hasInjection then
+    local f = fs.open("/startup.lua", "a")
+    f.write("\n" .. startupBootstrapper)
+    f.close()
+    print("Added library path to /startup.lua")
+    print("WARNING: You must reboot this computer for changes to take effect.")
+else
+    print("/startup.lua already contains library path.")
+end
+
+print("")
 if failed == 0 then
     print("Done. Run 'music' to launch SX-Music.")
 else

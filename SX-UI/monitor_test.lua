@@ -1,4 +1,4 @@
-local ui = require("lib.sxui.ui")
+local ui = require("ui")
 
 local mon = peripheral.find("monitor")
 if not mon then
