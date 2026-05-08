@@ -1,3 +1,4 @@
+require("sx")
 local ui = require("ui")
 
 -- Mega-test showing every widget in a multi-window layout.

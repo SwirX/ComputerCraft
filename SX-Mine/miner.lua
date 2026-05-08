@@ -1,5 +1,6 @@
 package.path = "/sxmine/?.lua;/?.lua;/?/init.lua;" .. package.path
 
+require("sx")
 local Net = require("net")
 local Tracker = require("tracker")
 local Inventory = require("inventory")

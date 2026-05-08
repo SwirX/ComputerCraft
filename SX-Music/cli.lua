@@ -1,3 +1,4 @@
+require("sx")
 local dfpwm = require("cc.audio.dfpwm")
 
 local MUSICLO_API = "https://ipod-2to6magyna-uc.a.run.app/"

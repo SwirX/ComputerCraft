@@ -143,6 +143,17 @@ local function registerPackage()
     local pf = fs.open(pkgPath, "w")
     pf.write(textutils.serialiseJSON(apps))
     pf.close()
+
+    if not fs.exists("/sx.lua") then
+        print(">> Fetching system boostrapper (/sx.lua)...")
+        local req = http.get("https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sx.lua")
+        if req then
+            local f = fs.open("/sx.lua", "w")
+            f.write(req.readAll())
+            f.close()
+            req.close()
+        end
+    end
 end
 
 -- SX-UI check --------------------------------------------------------------

@@ -1,9 +1,6 @@
--- CC sets CWD to the script folder, so absolute-style requires break unless
--- we explicitly add root-based search paths here.
-package.path = "/?.lua;/?/init.lua;" .. package.path
-
+require("sx")
 local Net = require("net")
-local ui = require("lib.sxui.ui")
+local ui = require("ui")
 
 if not Net.init() then
     print("Error: No rednet modem found on this dashboard.")

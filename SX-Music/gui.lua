@@ -1,4 +1,5 @@
--- SX-UI path is bootstrapped by /startup.lua
+require("sx")
+-- SX-UI path is bootstrapped by /sx.lua
 local ui                     = require("ui")
 local dfpwm                  = require("cc.audio.dfpwm")
 

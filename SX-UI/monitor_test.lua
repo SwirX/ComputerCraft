@@ -1,3 +1,4 @@
+require("sx")
 local ui = require("ui")
 
 local mon = peripheral.find("monitor")

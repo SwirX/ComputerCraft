@@ -68,25 +68,15 @@ local function setupPackage()
     pf.write(textutils.serialiseJSON(apps))
     pf.close()
 
-    local bootstrapper = [[
-local sxuiPath = "/lib/sxui/?.lua"
-if not package.path:find(sxuiPath, 1, true) then
-    package.path = package.path .. ";" .. sxuiPath
-end
-]]
-    local hasInjection = false
-    if fs.exists("/startup.lua") then
-        local sf = fs.open("/startup.lua", "r")
-        local s_content = sf.readAll() or ""
-        sf.close()
-        if s_content:find("/lib/sxui/?.lua", 1, true) then hasInjection = true end
-    end
-    if not hasInjection then
-        local sf = fs.open("/startup.lua", "a")
-        sf.write("\n" .. bootstrapper)
-        sf.close()
-        print(">> Added SX-UI library path to /startup.lua")
-        print(">> WARNING: You must reboot this computer for changes to take effect.")
+    if not fs.exists("/sx.lua") then
+        print(">> Fetching system boostrapper (/sx.lua)...")
+        local req = http.get("https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sx.lua")
+        if req then
+            local f = fs.open("/sx.lua", "w")
+            f.write(req.readAll())
+            f.close()
+            req.close()
+        end
     end
 end
 setupPackage()

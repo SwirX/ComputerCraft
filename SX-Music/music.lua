@@ -1,3 +1,5 @@
+require("sx")
+
 local isColor = term.isColor()
 local settingsFile = ".sxmusic_pref"
 
