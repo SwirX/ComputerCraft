@@ -1,4 +1,4 @@
--- SXOS Bootloader
+-- SXOS Custom Bootloader
 local configPath = "/.config/sxboot/config.lua"
 
 local config = {
@@ -6,11 +6,13 @@ local config = {
     timeout = 5,
     hidden = false,
     colors = {
-        background = colors.black,
+        background = colors.gray,
+        box_bg = colors.black,
         text = colors.lightGray,
-        selected_bg = colors.gray,
+        selected_bg = colors.cyan,
         selected_text = colors.white,
-        title = colors.blue
+        title = colors.white,
+        border = colors.lightGray
     }
 }
 
@@ -28,7 +30,7 @@ if fs.exists(configPath) then
 end
 
 local entries = {
-    "CraftOS",
+    "CraftOS Native",
     "SXOS"
 }
 
@@ -44,39 +46,66 @@ local w, h = term.getSize()
 local timer = os.startTimer(config.timeout)
 local timeoutRemaining = config.timeout
 
+local boxW = 30
+local boxH = #entries + 4
+local boxX = math.floor((w - boxW) / 2) + 1
+local boxY = math.floor((h - boxH) / 2) + 1
+
 local function drawMenu()
     term.setBackgroundColor(config.colors.background)
     term.clear()
 
-    -- Draw Title
-    local title = "GNU GRUB version SXOS-1.0"
-    term.setCursorPos(math.floor((w - #title) / 2) + 1, 2)
+    -- Draw shadow
+    term.setBackgroundColor(colors.gray)
+    for i = 1, boxH do
+        term.setCursorPos(boxX + 1, boxY + i)
+        term.write(string.rep(" ", boxW))
+    end
+
+    -- Draw central box
+    term.setBackgroundColor(config.colors.box_bg)
+    for i = 1, boxH do
+        term.setCursorPos(boxX, boxY + i - 1)
+        term.write(string.rep(" ", boxW))
+    end
+
+    -- Title
+    local title = " SX BOOTLOADER "
+    term.setCursorPos(boxX + math.floor((boxW - #title) / 2), boxY)
     term.setTextColor(config.colors.title)
     term.write(title)
 
-    local menuY = math.floor(h / 2) - 1
+    -- Border/accent line
+    term.setCursorPos(boxX + 2, boxY + 1)
+    term.setTextColor(config.colors.selected_bg)
+    term.write(string.rep("-", boxW - 4))
 
+    -- Entries
+    local menuY = boxY + 2
     for i, entry in ipairs(entries) do
-        term.setCursorPos(math.floor((w - #entry - 4) / 2) + 1, menuY + i - 1)
+        term.setCursorPos(boxX + 2, menuY + i - 1)
         if i == selected then
             term.setBackgroundColor(config.colors.selected_bg)
             term.setTextColor(config.colors.selected_text)
-            term.write(" * " .. entry .. " ")
+            term.write(" " .. entry .. string.rep(" ", boxW - 5 - #entry) .. ">")
         else
-            term.setBackgroundColor(config.colors.background)
+            term.setBackgroundColor(config.colors.box_bg)
             term.setTextColor(config.colors.text)
-            term.write("   " .. entry .. " ")
+            term.write(" " .. entry .. string.rep(" ", boxW - 4 - #entry))
         end
     end
 
+    -- Footer info
     term.setBackgroundColor(config.colors.background)
     term.setTextColor(config.colors.text)
-    term.setCursorPos(1, h - 2)
+    term.setCursorPos(1, h)
     term.clearLine()
+
     if timeoutRemaining > 0 then
-        term.write("Booting default in " .. math.ceil(timeoutRemaining) .. " seconds.")
-    else
-        term.write("Use arrow keys to select, enter to boot.")
+        term.setCursorPos(boxX + math.floor((boxW - 18) / 2), boxY + boxH)
+        term.setTextColor(colors.white)
+        term.setBackgroundColor(config.colors.background)
+        term.write("Default in " .. math.ceil(timeoutRemaining) .. "s...")
     end
 end
 
@@ -89,7 +118,7 @@ while true do
         if p1 == keys.up then
             selected = selected - 1
             if selected < 1 then selected = #entries end
-            timeoutRemaining = 0 -- Cancel timeout on input
+            timeoutRemaining = 0
             drawMenu()
         elseif p1 == keys.down then
             selected = selected + 1
@@ -116,10 +145,9 @@ term.clear()
 term.setCursorPos(1, 1)
 
 if selected == 1 then
-    print("Booting CraftOS...")
-    return -- Returns to the default shell
+    print("Executing native CraftOS...")
+    return
 elseif selected == 2 then
-    print("Booting SXOS...")
-    -- Run the kernel, which will override and loop
+    print("Initialize SXOS environment...")
     shell.run("/sys/kernel.lua")
 end

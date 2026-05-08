@@ -1,59 +1,274 @@
 # SXOS
 
-SXOS is a fully custom operating system and shell environment for ComputerCraft. It is designed to act as a complete layer on top of ComputerCraft, bypassing the default CraftOS `shell` pipeline entirely and prioritizing a robust, Linux-like architecture.
+**Version 2.0.0**
 
-## Features
-- **Isolated Environments**: Custom `cc.require` handling prevents modules and packages from bleeding between scopes.
-- **`bsh` (Better SHell)**: A powerful, lightweight custom shell supporting bash-style completions, aliases (`ll`, `la`), history caching, and dynamic execution.
-- **GNU GRUB-like Bootloader**: Configurable boot menu (`/.config/sxboot/config.lua`) handling timeouts and entry options between CraftOS and SXOS.
-- **Modular Directory Structure**: Linux-style (`/bin`, `/etc`, `/usr/bin`, `/scratch`, `/var`). Includes pre-mapped binaries.
-- **`sxfetch`**: A fastfetch/neofetch clone capable of displaying live system metrics such as resolution, shell strings, uptime, and the running Lua version inside visually rich ascii interfaces.
+A modular, event-driven operating system layer for ComputerCraft. SXOS is not a Linux clone. It is an OS designed specifically around Lua, ComputerCraft's event system, distributed networking, and peripheral-awareness.
 
-## Included Applications
-A suite of utilities mirrors standard Unix workflows inside the custom ecosystem:
-- **Core utils**: `cd`, `pwd`, `mkdir`, `touch`, `rm`, `cat`, `ls`, `cp`, `mv`, `clear`, `shutdown`, `reboot`, `curl`, `wget`.
-- **`yate` (Yet Another Text Editor)**: Minimal editor replacing CC's native `edit`, featuring robust scrolling and easy-read keybinds (`<F2>` Save, `<F3>` Quit).
-- **`yafe` (Yet Another File Explorer)**: Visual arrow-key interface for navigating folders dynamically.
+---
 
-## Package Management (`sxpm`)
-SXOS integrates tightly with **SXPM** (SX Package Manager), bringing complex Linux-like package management to ComputerCraft:
-- **Repositories & Channels**: Stream packages via `stable`, `testing`, or `nightly`.
-- **Dependency Resolution**: Installs and maps missing libraries automatically.
-- **Lockfiles & Manifests**: Ensure repeatable and secure software installations.
-- **Binary & Source Packages**: Supported natively via `.sxpkg` / `SXPKG` archive build scripts.
-- **Package Signing**: Trust-verified distributions to ensure ecosystem safety.
+## Architecture
 
-## Architectural Enforcements
-- *User configurations* must ALWAYS target `~/.config/<app>/` (e.g. `/home/username/.config/myapp/`).
-  To support dynamically resolving this correctly across multi-user environments, portable mounts, sandboxing, and potential home roaming formats, developers must inject configurations using `sx.config`:
+SXOS is organized into a strict separation of library code, system processes, and userspace binaries.
 
-  ```lua
-  local config = require("sx.config")
-  local appConfigPath = config.getAppDirectory("music")
-  -- Returns standard format e.g. "/home/username/.config/music"
-  ```
-  This is absolutely critical to the architecture. Instead of manually concatenating `fs.combine`, always utilize standardized filesystem APIs.
+```
+/
+├── boot/           Bootloader (Stage 1)
+├── sys/            Kernel and authentication (Stages 2-6)
+├── lib/
+│   ├── core/       Kernel-level primitives (events, process, service, log, env, sx)
+│   ├── fs/         Filesystem layer (vfs, path, permissions)
+│   ├── net/        Networking (rednet, discovery)
+│   ├── sh/         Shell subsystem (tokenizer, parser, expand, execute, builtins, completion)
+│   ├── pkg/        Package management (manifest, database, resolve)
+│   └── ui/         Terminal and themes (theme)
+├── bin/            Core system binaries
+├── usr/bin/        User-installed package binaries
+├── usr/lib/sxpkg/  Installed package files
+├── services/       Background daemon scripts
+├── etc/sxpm/       Repository configuration
+├── var/
+│   ├── lib/sxpm/   Installed package database
+│   ├── cache/sxpm/ Package download cache
+│   └── log/        System logs
+└── home/<user>/
+    └── .config/
+        └── bsh/    Shell theme configuration
+```
+
+### Boot Stages
+
+| Stage | Component | Responsibility |
+|-------|-----------|----------------|
+| 1 | Bootloader | OS selection, theme |
+| 2 | Kernel | Load core libraries and event router |
+| 3 | Kernel | VFS mount points (`/dev`, `/net`) |
+| 4 | Kernel | Start background services (`discoverd`) |
+| 5 | Auth | User login |
+| 6 | Shell | Spawn `bsh` session |
+
+### The Event System
+
+Every subsystem in SXOS communicates through a central event router rather than calling `os.pullEvent()` independently. This prevents race conditions when multiple subsystems run concurrently.
+
+```lua
+-- Services subscribe to events.
+sx.events.subscribe(pid, "modem_message", function(...) ... end)
+
+-- Anything can emit synthetic events intra-kernel.
+sx.events.emit("process_exit", some_pid)
+
+-- The kernel drives the loop.
+while true do
+    local event = table.pack(os.pullEventRaw())
+    sx.events.dispatch(event)
+    sx.proc.tick(event)
+end
+```
+
+### Process Model
+
+Every process is a coroutine with a formal identity:
+
+```lua
+{
+    pid          = number,
+    name         = string,
+    env          = table,       -- isolated Lua environment
+    cwd          = string,
+    stdin        = handle,
+    stdout       = handle,
+    stderr       = handle,
+    parent_pid   = number,
+    coroutine    = coroutine,
+    filter       = string,
+    status       = "running" | "suspended" | "dead",
+}
+```
+
+### Service Layer
+
+Daemons register with the kernel and expose named RPC endpoints. Any process can call a service without knowing its implementation.
+
+```lua
+-- Register a service (done in the service daemon itself).
+sx.service.register("audiod", pid, {
+    play = function(url) ... end,
+    stop = function() ... end,
+})
+
+-- Call it from anywhere.
+sx.service.call("audiod", "play", "http://...")
+```
+
+### Virtual Filesystem
+
+The VFS intercepts path-based operations at registered prefixes.
+
+```lua
+vfs.mount("/dev", devfs)   -- peripheral nodes
+vfs.mount("/net", netfs)   -- RPC-backed remote nodes
+
+-- /dev access maps to peripheral.wrap(name)
+local speaker = sx.fs.open("/dev/speaker0", "w")
+speaker.native.playAudio(...)
+
+-- /net access resolves via service discovery + RPC transport
+local file = sx.fs.open("/net/storage-node/data/hello.txt", "r")
+```
+
+> **Note on Permissions:** SXOS permissions are enforced at the API layer (`sx.fs`, `sx.proc`). Raw CraftOS `fs` calls bypass this sandbox. This is by design: SXOS is a controlled runtime, not a kernel-level security boundary.
+
+---
+
+## The Shell (bsh)
+
+`bsh` is the SXOS shell. It delegates all parse work to `/lib/sh/` and remains a thin frontend.
+
+### Supported Syntax
+
+```bash
+echo "hello world"
+cat test.txt > output.txt
+grep error < logs.txt
+cat latest.log | grep failed
+ls -la &
+export MY_VAR=hello
+source ~/.config/init.lua
+```
+
+| Feature | Status |
+|---------|--------|
+| Single and double quotes | Supported |
+| Backslash escaping | Supported |
+| `$VAR` and `${VAR}` expansion | Supported |
+| Tilde expansion (`~`) | Supported |
+| Pipes (`|`) | Supported |
+| Stdout redirect (`>`, `>>`) | Supported |
+| Stdin redirect (`<`) | Supported |
+| Background execution (`&`) | Supported |
+| Command sequences (`;`) | Supported |
+| Comments (`#`) | Supported |
+
+### Theme Configuration
+
+Place a file at `/home/<user>/.config/bsh/theme.lua` returning a table of color overrides:
+
+```lua
+return {
+    user_color    = colors.lime,
+    path_color    = colors.cyan,
+    cmd_color     = colors.yellow,
+    cmd_err_color = colors.red,
+}
+```
+
+---
+
+## Package Management (SXPM)
+
+```bash
+sxpm install music
+sxpm remove music
+sxpm search ui
+sxpm list
+sxpm update
+sxpm upgrade
+sxpm info music
+sxpm build /path/to/manifest.lua
+```
+
+### Package Manifest
+
+```lua
+return {
+    name         = "music",
+    version      = "1.2.0",
+    description  = "SX-Music audio player",
+    author       = "SwirX",
+    license      = "MIT",
+    channel      = "stable",
+    dependencies = {
+        "sxui >=1.0.0"
+    },
+    binaries = { "music" },
+    files    = {
+        { src = "gui.lua", dest = "/usr/lib/sxpkg/music/gui.lua" }
+    },
+}
+```
+
+Packages install into `/usr/lib/sxpkg/<name>/`. Binary wrappers are placed in `/usr/bin/`.
+
+---
+
+## Networking
+
+SXOS is built for distribution. All networking goes through `/lib/net/` and exposes as `/net/*` in the filesystem.
+
+```bash
+discover              # Show all SXOS hosts on the network
+ping 5                # Ping computer ID 5
+ping storage-node     # Ping by hostname (resolved via discovery)
+netstat               # Show local services and modem status
+```
+
+### /net/* Filesystem
+
+Paths under `/net/` are transparently routed through the VFS to remote hosts via RPC.
+
+```
+/net/storage-node/files/data.txt   -> reads from a remote host
+/net/base-monitor/display          -> addresses a remote monitor
+```
+
+---
+
+## Configuration Standards
+
+All application config lives in the user's home config directory.
+
+| Application | Config Path |
+|-------------|-------------|
+| Shell themes | `/home/<user>/.config/bsh/theme.lua` |
+| Bootloader | `/.config/sxboot/config.lua` |
+| SXPM repos | `/etc/sxpm/repos.lua` |
+
+Applications must not hardcode or concatenate paths manually. Use `sx.path.join()` or `sx.path.resolve()`.
+
+---
+
+## Developer Tooling
+
+| Command | Description |
+|---------|-------------|
+| `lua` | Interactive Lua REPL with persistent state |
+| `sxpm build` | Build and stage a package from a manifest |
+| `netstat` | Show local service registry and modem status |
+| `discover` | Scan the network for SXOS nodes |
+
+---
+
+## Internal API Stability
+
+Binaries must never directly access internal OS structures. All access goes through the `sx.*` facade loaded from `/lib/core/sx.lua`.
+
+| API | Provides |
+|-----|----------|
+| `sx.fs` | VFS-aware filesystem operations |
+| `sx.path` | Path manipulation utilities |
+| `sx.proc` | Process spawning and management |
+| `sx.events` | Event subscription and emission |
+| `sx.service` | Service registration and IPC |
+| `sx.net` | Networking and RPC |
+| `sx.pkg` | Package management operations |
+| `sx.make_logger(name)` | Per-source system logger |
+
+---
 
 ## Installation
 
-To install SXOS onto a raw ComputerCraft system directly from the internet, run the following command in the default CraftOS terminal:
-```bash
-wget run https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sxos/install.lua
-```
-*(Update the URL path to match your specific branch or repository if deploying manually!)*
+Copy the `sxos/` directory to your ComputerCraft computer and set `startup.lua` to the SXOS `startup.lua`. On first boot, the bootloader will appear and you can select SXOS from the menu.
 
-Alternatively, for local deployments, simply mount the repository onto your ComputerCraft Computer ID or map the folder onto an emulator path, and initialize the installer by typing:
-```bash
-/install.lua
-```
+---
 
-### 1. Easy Install
-Provides a modern, beginner-friendly guided setup. You will be prompted for a username and a password.
-If you skip the password, auto-login is enabled by default. The resulting profile is automatically injected into the `users` and `admin` groups for full filesystem permissions. The script performs an automated build of filesystem requirements and configurations.
-
-**Walkthrough Included**: Following completion, the automated profile generation provides a fast-start walkthrough describing how to use standard commands and tools available locally on your system.
-
-### 2. Advanced Install
-A manual install approach inspired by Arch Linux or Void Linux. The installer deliberately does **not** create standard users or directories for you.
-Instead, you are dropped cleanly into a temporary root memory space using `bsh` where autocompletion is forcefully disabled.
-From this environment, you are expected to manually build the directory skeleton (via `mkdir`), write your configs (via `yate /etc/sxos/users` etc.), define permissions, and prepare your filesystem manually, mirroring traditional bare-metal UNIX OS installations entirely from scratch. Type `reboot` once you have validated the files to jump back to `loader.lua` and boot the finalized OS.
+*SXOS is a ComputerCraft-native operating system. It is not Linux. It is built around what makes CC unique: events, peripherals, and distributed networking.*

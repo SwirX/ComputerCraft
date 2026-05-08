@@ -1,278 +1,240 @@
 -- /bin/bsh.lua
--- Better SHell for SXOS
+-- Better SHell for SXOS.
+-- This file is the thin frontend of the shell. All parsing logic lives in
+-- /lib/sh/. This file owns the interactive loop, the read-line UI, and
+-- the mutable shell_state table shared with builtins.
 
-local history = {}
-local aliases = {
-    ll = "ls -l",
-    la = "ls -a"
+local tokenizer    = dofile("/lib/sh/tokenizer.lua")
+local parser       = dofile("/lib/sh/parser.lua")
+local execute      = dofile("/lib/sh/execute.lua")
+local completion   = dofile("/lib/sh/completion.lua")
+
+-- shell_state is passed to builtins and the executor.
+-- It is the single authoritative source for mutable shell context.
+local shell_state  = {
+    cwd         = _ENV.ENV.HOME or "/",
+    env         = _ENV.ENV,
+    aliases     = { ll = "ls -l", la = "ls -a" },
+    process_env = _ENV,
+    history     = {},
 }
-local dir = _ENV.ENV.HOME or "/"
-_ENV.ENV.PWD = dir
-local path = _ENV.ENV.PATH or "/bin;/usr/bin"
-local runningProgram = "/bin/bsh.lua"
-local isInstaller = _ENV.INSTALLER_MODE
+_ENV.ENV.PWD       = shell_state.cwd
 
-local user = _ENV.ENV.USER or "user"
-local hostname = "sxos"
+local user         = _ENV.ENV.USER or "user"
+local hostname     = _ENV.ENV.HOSTNAME or "sxos"
+local is_installer = _ENV.INSTALLER_MODE or false
 
-local shellAPI = {
-    dir = function() return dir end,
-    setDir = function(d)
-        dir = d; _ENV.ENV.PWD = dir
-    end,
-    path = function() return path end,
-    setPath = function(p)
-        path = p; _ENV.ENV.PATH = path
-    end,
-    resolve = function(p)
-        if string.sub(p, 1, 1) == "/" then return fs.combine("", p) end
-        return fs.combine(dir, p)
-    end,
-    aliases = function() return aliases end,
-    setAlias = function(c, p) aliases[c] = p end,
-    clearAlias = function(c) aliases[c] = nil end,
-    getRunningProgram = function() return runningProgram end
-}
-_ENV.shell = shellAPI
+-- -----------------------------------------------------------------------
+-- Prompt rendering
+-- -----------------------------------------------------------------------
 
-local function resolveExecutable(name)
-    if aliases[name] then
-        local first = string.match(aliases[name], "[^ \t]+")
-        if first then return resolveExecutable(first), aliases[name] end
+local function load_theme()
+    local theme_path = (shell_state.env.HOME or "/home/" .. user) ..
+        "/.config/bsh/theme.lua"
+    if fs.exists(theme_path) then
+        local ok, result = pcall(dofile, theme_path)
+        if ok and type(result) == "table" then return result end
     end
-
-    local p = shellAPI.resolve(name)
-    if fs.exists(p) and not fs.isDir(p) then return p, nil end
-    if fs.exists(p .. ".lua") and not fs.isDir(p .. ".lua") then return p .. ".lua", nil end
-
-    for pathStr in string.gmatch(path, "[^;:]+") do
-        local testP = fs.combine(pathStr, name)
-        if fs.exists(testP) and not fs.isDir(testP) then return testP, nil end
-        if fs.exists(testP .. ".lua") and not fs.isDir(testP .. ".lua") then return testP .. ".lua", nil end
-    end
-    return nil, nil
-end
-shellAPI.resolveProgram = resolveExecutable
-
-function shellAPI.run(...)
-    local args = { ... }
-    if type(args[1]) == "string" then
-        args = {}
-        for s in string.gmatch(..., "[^ \t]+") do table.insert(args, s) end
-    end
-
-    local cmd = args[1]
-    if not cmd then return true end
-
-    local execPath, aliasCommand = resolveExecutable(cmd)
-
-    if aliasCommand then
-        -- Reparse based on alias
-        local newArgs = {}
-        for s in string.gmatch(aliasCommand, "[^ \t]+") do table.insert(newArgs, s) end
-        for i = 2, #args do table.insert(newArgs, args[i]) end
-        args = newArgs
-    end
-
-    if not execPath then
-        printError("bsh: " .. cmd .. ": command not found")
-        return false
-    end
-
-    table.remove(args, 1)
-
-    local fn, err = loadfile(execPath, "t", _ENV)
-    if not fn then
-        printError("bsh: " .. execPath .. ": load error: " .. err)
-        return false
-    end
-
-    local prevProgram = runningProgram
-    runningProgram = execPath
-    local ok, res = pcall(fn, table.unpack(args))
-    runningProgram = prevProgram
-
-    if not ok then
-        printError("bsh: " .. execPath .. ": " .. tostring(res))
-        return false
-    end
-    return true
+    -- Fallback default theme.
+    return {
+        user_color    = colors.green,
+        root_color    = colors.red,
+        host_color    = colors.white,
+        path_color    = colors.blue,
+        prompt_color  = colors.lightGray,
+        cmd_color     = colors.cyan,
+        cmd_err_color = colors.red,
+    }
 end
 
-shellAPI.execute = shellAPI.run
+local theme = load_theme()
 
-local function getCompletion(text)
-    if isInstaller then return nil end
-    local words = {}
-    for s in string.gmatch(text, "[^ \t]+") do table.insert(words, s) end
-    if string.sub(text, -1) == " " then table.insert(words, "") end
-
-    if #words <= 1 then
-        local cmd = words[1] or ""
-        for k, _ in pairs(aliases) do
-            if string.sub(k, 1, #cmd) == cmd then return string.sub(k, #cmd + 1) end
-        end
-        for pathStr in string.gmatch(path, "[^;:]+") do
-            if fs.exists(pathStr) then
-                for _, file in ipairs(fs.list(pathStr)) do
-                    local noExt = string.gsub(file, "%.lua$", "")
-                    if string.sub(noExt, 1, #cmd) == cmd then return string.sub(noExt, #cmd + 1) end
-                    if string.sub(file, 1, #cmd) == cmd then return string.sub(file, #cmd + 1) end
-                end
-            end
-        end
+local function draw_prompt()
+    local display_dir = shell_state.cwd
+    if display_dir == shell_state.env.HOME then
+        display_dir = "~"
     end
-    return nil
-end
 
-local function drawPrompt()
-    local promptDir = dir
-    if promptDir == _ENV.ENV.HOME then
-        promptDir = "~"
-    end
-    term.setTextColor(user == "root" and colors.red or colors.green)
-    write(user .. "@" .. hostname)
+    local user_color = (user == "root") and theme.root_color or theme.user_color
+    term.setTextColor(user_color)
+    write(user)
+    term.setTextColor(theme.host_color)
+    write("@" .. hostname)
     term.setTextColor(colors.white)
     write(" ")
-    term.setTextColor(colors.blue)
-    write(promptDir)
-    term.setTextColor(colors.lightGray)
-    write(user == "root" and " # " or " $ ")
+    term.setTextColor(theme.path_color)
+    write(display_dir)
+    term.setTextColor(theme.prompt_color)
+    write((user == "root") and " # " or " $ ")
     term.setTextColor(colors.white)
 end
 
+-- -----------------------------------------------------------------------
+-- Read-line with history, inline completion, and syntax highlighting
+-- -----------------------------------------------------------------------
+
 local function read_line()
-    drawPrompt()
-    local startX, startY = term.getCursorPos()
-    local w, h = term.getSize()
+    draw_prompt()
+
+    local start_x, start_y = term.getCursorPos()
+    local term_width = term.getSize()
     local line = ""
-    local pos = 0
-    local suggestion = ""
-    local historyPos = #history + 1
-    local scroll = 0
+    local cursor_pos = 0
+    local history_pos = #shell_state.history + 1
+    local scroll_offset = 0
 
     local function redraw()
-        local maxLen = w - startX
-        if pos - scroll > maxLen then
-            scroll = pos - maxLen
-        elseif pos < scroll then
-            scroll = pos
+        local visible_width = term_width - start_x
+        if cursor_pos - scroll_offset > visible_width then
+            scroll_offset = cursor_pos - visible_width
+        elseif cursor_pos < scroll_offset then
+            scroll_offset = cursor_pos
         end
 
-        term.setCursorPos(startX, startY)
-        local visible = string.sub(line, scroll + 1, scroll + maxLen)
+        term.setCursorPos(start_x, start_y)
+        local visible = string.sub(line, scroll_offset + 1, scroll_offset + visible_width)
 
-        local cmdEnd = string.find(visible, " ")
-        if not cmdEnd then cmdEnd = #visible + 1 end
-        local cmdStr = string.sub(visible, 1, cmdEnd - 1)
-        local restStr = string.sub(visible, cmdEnd)
+        -- Highlight the command token in the appropriate color.
+        local space_pos = string.find(visible, " ")
+        local cmd_part = space_pos and string.sub(visible, 1, space_pos - 1) or visible
+        local remainder = space_pos and string.sub(visible, space_pos) or ""
 
-        if #cmdStr > 0 then
-            local isCmd = resolveExecutable(string.sub(line, 1, (string.find(line, " ") or (#line + 1)) - 1))
-            term.setTextColor(isCmd and colors.cyan or colors.red)
-            write(cmdStr)
+        if #cmd_part > 0 then
+            local first_word = string.match(line, "^%S+") or ""
+            local path_str = shell_state.env.PATH or "/bin;/usr/bin"
+            local cmd_exists = shell_state.aliases[first_word] ~= nil
+            if not cmd_exists then
+                for dir in string.gmatch(path_str, "[^;:]+") do
+                    if fs.exists(fs.combine(dir, first_word))
+                        or fs.exists(fs.combine(dir, first_word .. ".lua"))
+                    then
+                        cmd_exists = true
+                        break
+                    end
+                end
+            end
+            term.setTextColor(cmd_exists and theme.cmd_color or theme.cmd_err_color)
+            write(cmd_part)
         end
         term.setTextColor(colors.white)
-        write(restStr)
+        write(remainder)
 
-        if not isInstaller and #line > 0 and pos == #line then
-            suggestion = getCompletion(line) or ""
-            local sugVisible = string.sub(suggestion, 1, maxLen - #visible)
-            term.setTextColor(colors.gray)
-            write(sugVisible)
-        else
-            suggestion = ""
+        -- Inline completion hint.
+        local hint = ""
+        if not is_installer and cursor_pos == #line and #line > 0 then
+            local suffix = completion.complete(line, cursor_pos, shell_state)
+            if suffix then
+                hint = suffix
+                term.setTextColor(colors.gray)
+                local hint_visible = string.sub(hint, 1, visible_width - #visible)
+                write(hint_visible)
+            end
         end
 
-        local cx, cy = term.getCursorPos()
-        if cx <= w then
-            term.write(string.rep(" ", w - cx + 1))
+        local cx = term.getCursorPos()
+        if cx <= term_width then
+            term.write(string.rep(" ", term_width - cx + 1))
         end
-
-        term.setCursorPos(startX + (pos - scroll), startY)
+        term.setCursorPos(start_x + (cursor_pos - scroll_offset), start_y)
         term.setTextColor(colors.white)
+        return hint
     end
 
-    redraw()
+    local current_hint = redraw()
 
     while true do
-        local event, p1, p2, p3 = os.pullEvent()
+        local event, p1 = os.pullEvent()
+
         if event == "char" then
-            line = string.sub(line, 1, pos) .. p1 .. string.sub(line, pos + 1)
-            pos = pos + 1
-            redraw()
+            line = string.sub(line, 1, cursor_pos) .. p1 .. string.sub(line, cursor_pos + 1)
+            cursor_pos = cursor_pos + 1
+            current_hint = redraw()
         elseif event == "key" then
             if p1 == keys.enter then
                 print()
                 break
-            elseif p1 == keys.backspace and pos > 0 then
-                line = string.sub(line, 1, pos - 1) .. string.sub(line, pos + 1)
-                pos = pos - 1
-                redraw()
-            elseif p1 == keys.left and pos > 0 then
-                pos = pos - 1
-                redraw()
+            elseif p1 == keys.backspace and cursor_pos > 0 then
+                line = string.sub(line, 1, cursor_pos - 1) .. string.sub(line, cursor_pos + 1)
+                cursor_pos = cursor_pos - 1
+                current_hint = redraw()
+            elseif p1 == keys.left and cursor_pos > 0 then
+                cursor_pos = cursor_pos - 1
+                current_hint = redraw()
             elseif p1 == keys.right then
-                if pos < #line then
-                    pos = pos + 1
-                    redraw()
-                elseif #suggestion > 0 then
-                    line = line .. suggestion
-                    pos = #line
-                    redraw()
+                if cursor_pos < #line then
+                    cursor_pos = cursor_pos + 1
+                    current_hint = redraw()
+                elseif #current_hint > 0 then
+                    line = line .. current_hint
+                    cursor_pos = #line
+                    current_hint = redraw()
                 end
-            elseif p1 == keys.tab and #suggestion > 0 then
-                line = line .. suggestion
-                pos = #line
-                redraw()
+            elseif p1 == keys.tab and #current_hint > 0 then
+                line = line .. current_hint
+                cursor_pos = #line
+                current_hint = redraw()
             elseif p1 == keys.up then
-                if historyPos > 1 then
-                    historyPos = historyPos - 1
-                    line = history[historyPos]
-                    pos = #line
-                    redraw()
+                if history_pos > 1 then
+                    history_pos = history_pos - 1
+                    line = shell_state.history[history_pos] or ""
+                    cursor_pos = #line
+                    current_hint = redraw()
                 end
             elseif p1 == keys.down then
-                if historyPos < #history then
-                    historyPos = historyPos + 1
-                    line = history[historyPos]
-                    pos = #line
-                    redraw()
-                elseif historyPos == #history then
-                    historyPos = historyPos + 1
+                if history_pos < #shell_state.history then
+                    history_pos = history_pos + 1
+                    line = shell_state.history[history_pos] or ""
+                    cursor_pos = #line
+                    current_hint = redraw()
+                elseif history_pos == #shell_state.history then
+                    history_pos = history_pos + 1
                     line = ""
-                    pos = 0
-                    redraw()
+                    cursor_pos = 0
+                    current_hint = redraw()
                 end
             end
         end
     end
 
-    if #line > 0 and line ~= history[#history] then
-        table.insert(history, line)
+    if #line > 0 and line ~= shell_state.history[#shell_state.history] then
+        table.insert(shell_state.history, line)
     end
     return line
 end
 
--- Core loop
+-- -----------------------------------------------------------------------
+-- Main shell loop
+-- -----------------------------------------------------------------------
+
 term.setTextColor(colors.lightGray)
-print("Welcome to bsh (Better SHell).")
-if isInstaller then
-    print("Warning: Installer TTY active. Autocompletion disabled.")
+if is_installer then
+    print("SXOS Installer TTY. Type 'exit' to finish.")
+else
+    print("bsh " .. (os.date and os.date("%Y-%m-%d") or "") .. "  Type 'help' for help.")
 end
 
 while true do
-    local success, line = pcall(read_line)
-    if not success then
+    local ok, line = pcall(read_line)
+    if not ok then
         print()
         break
     end
 
-    if line == "exit" then
-        break
-    elseif string.match(line, "^%s*$") then
-        -- do nothing
-    else
-        shellAPI.run(line)
+    -- Skip blank lines.
+    if string.match(line, "^%s*$") then
+        goto continue
     end
+
+    -- Parse and execute.
+    local tokens = tokenizer.tokenize(line)
+    local ast, parse_err = parser.parse(tokens)
+
+    if parse_err then
+        printError("bsh: parse error: " .. parse_err)
+    elseif ast then
+        local keep_running = execute.run(ast, shell_state)
+        if not keep_running then break end
+    end
+
+    ::continue::
 end

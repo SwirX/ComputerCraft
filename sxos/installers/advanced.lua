@@ -14,13 +14,11 @@ if not fs.exists("/bin/bsh.lua") then
     return
 end
 
-local env_fn, err = loadfile("/sys/env.lua", nil, _ENV)
-if not env_fn then
-    printError("Failed to load /sys/env.lua: " .. tostring(err))
+local ok, sys_env = pcall(dofile, "/sys/env.lua")
+if not ok or not sys_env then
+    printError("Failed to load /sys/env.lua: " .. tostring(sys_env))
     return
 end
-
-local sys_env = env_fn()
 local process_env = sys_env.create_process_env(_G, {
     PATH = "/bin;/usr/bin",
     HOME = "/root",
