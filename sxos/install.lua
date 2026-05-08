@@ -1,4 +1,81 @@
 -- SXOS Installation Selector
+local repoBase = "https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sxos"
+
+local filesToDownload = {
+    "/startup.lua",
+    "/installers/easy.lua",
+    "/installers/advanced.lua",
+    "/boot/loader.lua",
+    "/etc/skel/config/sxboot/config.lua",
+    "/sys/kernel.lua",
+    "/sys/env.lua",
+    "/sys/auth.lua",
+    "/lib/sx/config.lua",
+    "/bin/bsh.lua",
+    "/bin/cd.lua",
+    "/bin/pwd.lua",
+    "/bin/mkdir.lua",
+    "/bin/mkcd.lua",
+    "/bin/touch.lua",
+    "/bin/rm.lua",
+    "/bin/cat.lua",
+    "/bin/ls.lua",
+    "/bin/cp.lua",
+    "/bin/mv.lua",
+    "/bin/clear.lua",
+    "/bin/wget.lua",
+    "/bin/curl.lua",
+    "/bin/git.lua",
+    "/bin/reboot.lua",
+    "/bin/shutdown.lua",
+    "/usr/bin/yate.lua",
+    "/usr/bin/yafe.lua",
+    "/usr/bin/sxfetch.lua",
+    "/README.md"
+}
+
+term.clear()
+term.setCursorPos(1, 1)
+print("Welcome to the SXOS Live Environment")
+
+write("Do you want to download SXOS files from GitHub? (y/n) ")
+if read() == "y" then
+    print("\nDownloading core system files...")
+    for i, path in ipairs(filesToDownload) do
+        local url = repoBase .. path
+        local cx, cy = term.getCursorPos()
+        term.setCursorPos(1, cy)
+        term.clearLine()
+        term.setTextColor(colors.gray)
+        write("Downloading (" .. i .. "/" .. #filesToDownload .. "): " .. fs.getName(path))
+
+        local res = http.get(url)
+        if res then
+            local data = res.readAll()
+            res.close()
+
+            local fullPath = string.sub(path, 2) -- remove leading slash for CC combine logic safety
+            local dir = fs.getDir(fullPath)
+            if dir and dir ~= "" and dir ~= ".." and not fs.exists(dir) then
+                fs.makeDir(dir)
+            end
+
+            local f = fs.open(fullPath, "w")
+            if f then
+                f.write(data)
+                f.close()
+            else
+                printError("\nFailed to write " .. fullPath)
+            end
+        else
+            printError("\nFailed to download: " .. path)
+        end
+    end
+    print("\n\nDownload complete!")
+    term.setTextColor(colors.white)
+    sleep(1)
+end
+
 term.clear()
 term.setCursorPos(1, 1)
 print("Welcome to the SXOS Live Environment")
@@ -48,7 +125,7 @@ term.clear()
 term.setCursorPos(1, 1)
 
 if selected == 1 then
-    shell.run("/installers/easy.lua")
+    shell.run("installers/easy.lua")
 elseif selected == 2 then
-    shell.run("/installers/advanced.lua")
+    shell.run("installers/advanced.lua")
 end
