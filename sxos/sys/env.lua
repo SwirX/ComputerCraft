@@ -18,7 +18,8 @@ function _M.create_process_env(parentEnv, envVars)
 
     -- set up custom require using cc.require.make
     -- this ensures that module contexts do not bleed into the global CraftOS package
-    local req, pkg = cc.require.make(newEnv, "/")
+    local cc_req = require("cc.require")
+    local req, pkg = cc_req.make(newEnv, "/")
     newEnv.require = req
     newEnv.package = pkg
 
