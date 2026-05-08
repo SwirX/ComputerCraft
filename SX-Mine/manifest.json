@@ -1,0 +1,8 @@
+{
+    "id": "sxmine",
+    "name": "SX-Mine",
+    "version": "3.0.0",
+    "type": "application",
+    "description": "Advanced automated mining fleet management system, featuring smart tracking and inventory dashboard.",
+    "author": "SwirX"
+}

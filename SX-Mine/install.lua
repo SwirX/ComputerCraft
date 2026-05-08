@@ -128,6 +128,23 @@ local function downloadTo(repoBase, remotePath, localPath)
     end
 end
 
+local function registerPackage()
+    local pkgPath = "/.sx_packages.json"
+    local apps = {}
+    if fs.exists(pkgPath) then
+        local f = fs.open(pkgPath, "r")
+        local content = f.readAll()
+        f.close()
+        if content and content ~= "" then
+            apps = textutils.unserialiseJSON(content) or {}
+        end
+    end
+    apps["sxmine"] = { version = SXMINE_VERSION, type = "application", name = "SX-Mine" }
+    local pf = fs.open(pkgPath, "w")
+    pf.write(textutils.serialiseJSON(apps))
+    pf.close()
+end
+
 -- SX-UI check --------------------------------------------------------------
 
 local function isSxuiInstalled()
@@ -240,6 +257,7 @@ local function runMasterInstall()
 
     -- Version marker
     writeFile(SXMINE_DIR .. ".version", SXMINE_VERSION)
+    registerPackage()
 
     print()
     printColored(colors.lime, "Master install complete.")
@@ -264,6 +282,7 @@ local function runNodeInstall()
         installFiles(SHARED_FILES, SXMINE_BASE)
         installFiles(NODE_FILES, SXMINE_BASE)
         writeFile(SXMINE_DIR .. ".version", SXMINE_VERSION)
+        registerPackage()
         print()
         printColored(colors.lime, "Node install complete.")
         print("Run: sxmine/startup.lua")
@@ -279,6 +298,7 @@ local function runNodeInstall()
         end
         receiveProvision()
         writeFile(SXMINE_DIR .. ".version", SXMINE_VERSION)
+        registerPackage()
         print("Run: sxmine/startup.lua")
     else
         printColored(colors.red, "Invalid selection.")

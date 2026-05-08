@@ -114,31 +114,21 @@ if pf then
 end
 
 print("")
-print("Setting up SX-UI library path in /startup.lua...")
-local startupBootstrapper = [[
-local sxuiPath = "/lib/sxui/?.lua"
-if not package.path:find(sxuiPath, 1, true) then
-    package.path = package.path .. ";" .. sxuiPath
-end
-]]
-local hasInjection = false
-if fs.exists("/startup.lua") then
-    local f = fs.open("/startup.lua", "r")
-    local content = f.readAll() or ""
+print("Registering SX-Music package...")
+local pkgPath = "/.sx_packages.json"
+local apps = {}
+if fs.exists(pkgPath) then
+    local f = fs.open(pkgPath, "r")
+    local content = f.readAll()
     f.close()
-    if content:find("/lib/sxui/?.lua", 1, true) then
-        hasInjection = true
+    if content and content ~= "" then
+        apps = textutils.unserialiseJSON(content) or {}
     end
 end
-if not hasInjection then
-    local f = fs.open("/startup.lua", "a")
-    f.write("\n" .. startupBootstrapper)
-    f.close()
-    print("Added library path to /startup.lua")
-    print("WARNING: You must reboot this computer for changes to take effect.")
-else
-    print("/startup.lua already contains library path.")
-end
+apps["sxmusic"] = { version = "1.0.0", type = "application", name = "SX-Music" }
+local reqPf = fs.open(pkgPath, "w")
+reqPf.write(textutils.serialiseJSON(apps))
+reqPf.close()
 
 print("")
 if failed == 0 then

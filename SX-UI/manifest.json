@@ -1,0 +1,8 @@
+{
+    "id": "sxui",
+    "name": "SX-UI",
+    "version": "2.2.0",
+    "type": "library",
+    "description": "A modern, object-oriented UI framework for ComputerCraft featuring UDim2 layouts, animations, and widgets.",
+    "author": "SwirX"
+}

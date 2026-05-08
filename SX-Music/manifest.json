@@ -1,0 +1,8 @@
+{
+    "id": "sxmusic",
+    "name": "SX-Music",
+    "version": "1.0.0",
+    "type": "application",
+    "description": "A high-quality networked audio streaming application and library for CC: Tweaked.",
+    "author": "SwirX"
+}
