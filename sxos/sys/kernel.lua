@@ -1,6 +1,6 @@
 -- /sys/kernel.lua
 local function load_module(path)
-    local fn, err = loadfile(path)
+    local fn, err = loadfile(path, nil, _ENV)
     if not fn then error("Kernel failed to load " .. path .. ": " .. err, 0) end
     return fn()
 end
@@ -30,7 +30,7 @@ if not fs.exists(shell_path) then
     error("Kernel panic: Configured shell not found: " .. shell_path, 0)
 end
 
-local bsh_fn, err = loadfile(shell_path, "t", process_env)
+local bsh_fn, err = loadfile(shell_path, nil, process_env)
 if not bsh_fn then
     error("Kernel failed to launch shell: " .. err, 0)
 end

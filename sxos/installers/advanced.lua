@@ -14,7 +14,7 @@ if not fs.exists("/bin/bsh.lua") then
     return
 end
 
-local env_fn, err = loadfile("/sys/env.lua")
+local env_fn, err = loadfile("/sys/env.lua", nil, _ENV)
 if not env_fn then
     printError("Failed to load /sys/env.lua: " .. tostring(err))
     return
@@ -28,7 +28,7 @@ local process_env = sys_env.create_process_env(_G, {
 })
 
 process_env.INSTALLER_MODE = true
-local bsh, berr = loadfile("/bin/bsh.lua", "t", process_env)
+local bsh, berr = loadfile("/bin/bsh.lua", nil, process_env)
 if bsh then
     bsh()
 else
