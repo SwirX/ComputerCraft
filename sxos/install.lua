@@ -1,5 +1,4 @@
 -- SXOS Installation Selector
-local repoBase = "https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sxos"
 
 local filesToDownload = {
     "/startup.lua",
@@ -40,6 +39,17 @@ print("Welcome to the SXOS Live Environment")
 
 write("Do you want to download SXOS files from GitHub? (y/n) ")
 if read() == "y" then
+    print("\nSelect deploy branch:")
+    print("1. dev (Default)")
+    print("2. main")
+    write("Branch [1]: ")
+    local branchChoice = read()
+    local branch = "dev"
+    if branchChoice == "2" or string.lower(branchChoice) == "main" then
+        branch = "main"
+    end
+    local repoBase = "https://raw.githubusercontent.com/SwirX/ComputerCraft/" .. branch .. "/sxos"
+
     print("\nDownloading core system files...")
     for i, path in ipairs(filesToDownload) do
         local url = repoBase .. path
