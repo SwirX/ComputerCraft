@@ -1,6 +1,11 @@
 local isColor = term.isColor()
 local settingsFile = ".sxmusic_pref"
 
+local sxuiPath = "/lib/sxui/?.lua"
+if not package.path:find(sxuiPath, 1, true) then
+    package.path = package.path .. ";" .. sxuiPath
+end
+
 local pref = nil
 if fs.exists(settingsFile) then
     local f = fs.open(settingsFile, "r")
