@@ -38,7 +38,7 @@ SXOS integrates tightly with **SXPM** (SX Package Manager), bringing complex Lin
 
 To install SXOS onto a raw ComputerCraft system directly from the internet, run the following command in the default CraftOS terminal:
 ```bash
-wget run https://raw.githubusercontent.com/SwirX/sxos/main/install.lua
+wget run https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sxos/install.lua
 ```
 *(Update the URL path to match your specific branch or repository if deploying manually!)*
 
