@@ -75,7 +75,14 @@ shell_env.sx_events      = events
 shell_env.sx_service     = svc
 shell_env.sx_log         = log
 
-local shell_path         = userinfo.shell or "/bin/bsh.lua"
+if system_config.enable_vfs then
+    local sx_perms = load_lib("/lib/sx/vfs.lua")
+    sx_perms.init()
+    shell_env.fs = sx_perms.create_fs(username)
+    shell_env.sx_perms = sx_perms
+end
+
+local shell_path = userinfo.shell or "/bin/bsh.lua"
 if not fs.exists(shell_path) then
     log.fatal("kernel", "Stage 6: shell not found: " .. shell_path)
 end

@@ -41,20 +41,30 @@ local function print_usage()
     print("  publish <path>  Publish a built package to a repository")
 end
 
--- Download a package from a known repository URL by name.
--- This is a stub: real implementation requires HTTP or Rednet transport.
+local function get_repos()
+    local ok, res = pcall(database_module.load_repos)
+    if ok and type(res) == "table" and #res > 0 then return res end
+    return { { url = "https://raw.githubusercontent.com/SwirX/ComputerCraft/main/sx_packages" } }
+end
+
 local function fetch_package(package_name)
-    local repos = database_module.load_repos()
-    for _, repo in ipairs(repos) do
+    for _, repo in ipairs(get_repos()) do
         local manifest_url = repo.url .. "/" .. package_name .. "/manifest.lua"
-        -- In a live SXOS system this would use sx.net or http.get.
-        -- For now we check if a local cached copy exists.
-        local cache_path = "/var/cache/sxpm/" .. package_name .. "/manifest.lua"
-        if fs.exists(cache_path) then
-            return manifest_module.load_file(cache_path)
+        local res = http.get(manifest_url)
+        if res then
+            local data = res.readAll(); res.close()
+            local cache_path = "/var/cache/sxpm/" .. package_name .. "/manifest.lua"
+            if not fs.exists(fs.getDir(cache_path)) then fs.makeDir(fs.getDir(cache_path)) end
+            local f = fs.open(cache_path, "w"); f.write(data); f.close()
+
+            local pkg, err = manifest_module.load_file(cache_path)
+            if pkg then
+                pkg._repo_url = repo.url .. "/" .. package_name
+                return pkg
+            end
         end
     end
-    return nil, "package not found in any repository: " .. package_name
+    return nil, "package not found in repositories: " .. package_name
 end
 
 local function cmd_install(package_name)
@@ -89,14 +99,24 @@ local function cmd_install(package_name)
     local install_path = INSTALL_BASE .. "/" .. package_name
     if not fs.exists(install_path) then fs.makeDir(install_path) end
 
-    -- Copy installed files.
-    local cache_dir = "/var/cache/sxpm/" .. package_name
+    print("Downloading files...")
     for _, file_entry in ipairs(pkg.files or {}) do
-        local src = fs.combine(cache_dir, file_entry.src)
         local dest = file_entry.dest
-        local dest_dir = string.match(dest, "^(.*)/[^/]+$") or "/"
-        if not fs.exists(dest_dir) then fs.makeDir(dest_dir) end
-        if fs.exists(src) then fs.copy(src, dest) end
+        local dest_dir = fs.getDir(dest)
+        if dest_dir ~= "" and not fs.exists(dest_dir) then fs.makeDir(dest_dir) end
+
+        write("  GET " .. file_entry.src .. " -> " .. dest .. " ... ")
+        local file_url = pkg._repo_url .. "/" .. file_entry.src
+        local file_res = http.get(file_url)
+        if file_res then
+            local data = file_res.readAll(); file_res.close()
+            local f = fs.open(dest, "w")
+            if f then
+                f.write(data); f.close(); print("OK")
+            else print("ERR (fs)") end
+        else
+            print("ERR (http)")
+        end
     end
 
     -- Create wrapper scripts in /usr/bin for each declared binary.
@@ -174,19 +194,54 @@ end
 
 local function cmd_search(query)
     if not query then
-        printError("sxpm search: query required")
-        return
+        printError("sxpm search: query required"); return
     end
     print("Searching repositories for '" .. query .. "'...")
-    -- Stub: in a real implementation this queries repo indexes.
-    print("(Repository search requires network access and repo index sync.)")
-    print("Run 'sxpm update' first to sync repository metadata.")
+
+    local found = false
+    if fs.exists("/var/cache/sxpm") then
+        for _, file in ipairs(fs.list("/var/cache/sxpm")) do
+            if string.match(file, "^index_.*%.json$") then
+                local f = fs.open("/var/cache/sxpm/" .. file, "r")
+                if f then
+                    local data = textutils.unserializeJSON(f.readAll() or "")
+                    f.close()
+                    if data and data.packages then
+                        for pkg, meta in pairs(data.packages) do
+                            if string.find(string.lower(pkg), string.lower(query)) or
+                                (meta.description and string.find(string.lower(meta.description), string.lower(query))) then
+                                print(string.format("  %-20s %s", pkg, meta.version or "unk"))
+                                if meta.description then print("    " .. meta.description) end
+                                found = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if not found then
+        print("No packages found. Try running 'sxpm update' first if you haven't recently.")
+    end
 end
 
 local function cmd_update()
     print("Syncing repository metadata...")
-    -- Stub: would download index files from each repo URL.
-    print("(Repository sync not yet connected to network backend.)")
+    for _, repo in ipairs(get_repos()) do
+        local index_url = string.gsub(repo.url, "sx_packages/?$", "") .. ".sx_packages.json"
+        print("Fetching " .. index_url)
+        local res = http.get(index_url)
+        if res then
+            local data = res.readAll(); res.close()
+            local safe_name = string.gsub(repo.url, "[^%w]", "_")
+            local cache_path = "/var/cache/sxpm/index_" .. safe_name .. ".json"
+            if not fs.exists(fs.getDir(cache_path)) then fs.makeDir(fs.getDir(cache_path)) end
+            local f = fs.open(cache_path, "w"); f.write(data); f.close()
+            print("Synced cache for " .. repo.url)
+        else
+            print("Failed to sync " .. repo.url)
+        end
+    end
 end
 
 local function cmd_upgrade()

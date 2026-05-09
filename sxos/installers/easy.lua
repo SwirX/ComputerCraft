@@ -6,6 +6,14 @@ local username = read()
 write("Enter password (leave blank for auto-login): ")
 local password = read("*")
 
+write("\nEnter computer hostname (default: sxos): ")
+local host = read()
+if host == "" then host = "sxos" end
+
+write("\nEnable Virtual Filesystem (VFS) to enforce file permissions/ownership system-wide? (y/n) [y]: ")
+local vfsChoice = read()
+local enableVFS = (vfsChoice == "" or vfsChoice:lower() == "y")
+
 print("\nCreating directories...")
 local dirs = { "/bin", "/etc", "/home", "/lib", "/root", "/tmp", "/usr/bin", "/usr/lib", "/var", "/.config", "/etc/sxpm",
     "/var/lib/sxpm", "/var/cache/sxpm", "/usr/lib/sxpm" }
@@ -46,7 +54,8 @@ saveFile("/etc/sxos/users", users)
 local config = {
     autologin = autoLogin,
     autologin_user = autoLogin and username or nil,
-    installed = true
+    installed = true,
+    enable_vfs = enableVFS
 }
 saveFile("/etc/sxos/config.lua", config)
 
@@ -64,4 +73,5 @@ print("Configurations automatically save to ~/.config/<app>.")
 print("\nPress any key to reboot and enter your new system.")
 os.pullEvent("key")
 
+os.setComputerLabel(host)
 os.reboot()

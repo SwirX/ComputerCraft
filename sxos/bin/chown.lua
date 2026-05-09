@@ -4,12 +4,10 @@ if #args < 2 then
     return
 end
 
-local ok, vfs = pcall(require, "lib.sx.vfs")
-if not ok then
-    printError("chown: vfs disabled"); return
+local vfs = _ENV.sx_perms
+if not vfs then
+    printError("chown: vfs disabled via installer config"); return
 end
-
-vfs.init()
 local newOwner = args[1]
 local path = shell.resolve(args[2])
 

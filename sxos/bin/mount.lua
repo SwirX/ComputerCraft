@@ -1,25 +1,23 @@
 local args = { ... }
-local ok, vfs = pcall(require, "lib.sx.vfs")
-if not ok then
-    printError("mount: vfs disabled"); return
-end
-vfs.init()
-
 if #args == 0 then
-    -- list mounts
-    print("Logical System Mounts:")
-    for mnt, target in pairs(vfs.getMounts()) do
-        print(target .. " on " .. mnt)
+    -- list active disk mounts
+    print("Active mounts:")
+    local found = false
+    local drives = { peripheral.find("drive") }
+    for _, drive in ipairs(drives) do
+        if drive.isDiskPresent() and drive.hasData() then
+            local mountPath = drive.getMountPath()
+            print("  " .. peripheral.getName(drive) .. " -> /" .. mountPath)
+            found = true
+        end
     end
+    if not found then print("  None") end
     return
 end
 
-if #args < 2 then
-    printError("mount: missing operand")
-    return
+local name = args[1]
+if disk.isPresent(name) and disk.hasData(name) then
+    print("Disk is mounted at: /" .. disk.getMountPath(name))
+else
+    printError("No data disk found on: " .. name)
 end
-local target = args[1]
-local mnt = shell.resolve(args[2])
-
-vfs.setMount(mnt, target)
-print("Mounted " .. target .. " into " .. mnt)
