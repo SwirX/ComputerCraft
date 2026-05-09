@@ -4,6 +4,7 @@ if #args == 0 then
     return
 end
 for _, dir in ipairs(args) do
-    local p = shell.resolve(dir)
+    local pwd = (_ENV.ENV and _ENV.ENV.PWD) or "/"
+    local p = string.sub(dir, 1, 1) == "/" and dir or ("/" .. fs.combine(pwd, dir))
     fs.makeDir(p)
 end

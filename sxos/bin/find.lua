@@ -1,5 +1,7 @@
 local args = { ... }
-local rootPath = shell.resolve(args[1] or ".")
+local targetDir = args[1] or "."
+local pwd = (_ENV.ENV and _ENV.ENV.PWD) or "/"
+local rootPath = string.sub(targetDir, 1, 1) == "/" and targetDir or ("/" .. fs.combine(pwd, targetDir))
 local namePattern = nil
 
 for i = 1, #args do

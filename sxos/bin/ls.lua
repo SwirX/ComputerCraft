@@ -10,8 +10,9 @@ for _, arg in ipairs(args) do
     end
 end
 
-local tDir = targetDir or shell.dir()
-local p = shell.resolve(tDir)
+local tDir = targetDir or (_ENV.ENV and _ENV.ENV.PWD or "/")
+local pwd = (_ENV.ENV and _ENV.ENV.PWD) or "/"
+local p = string.sub(tDir, 1, 1) == "/" and tDir or ("/" .. fs.combine(pwd, tDir))
 
 if not fs.exists(p) then
     printError("ls: cannot access '" .. tDir .. "': No such file or directory"); return

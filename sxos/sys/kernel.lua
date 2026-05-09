@@ -104,15 +104,47 @@ local shell_pid = proc.spawn(shell_fn, {
 --   1. The event router (for all subscribers)
 --   2. The process scheduler (for all coroutines)
 while true do
-    local event_packet = table.pack(os.pullEventRaw())
-    events.dispatch(event_packet)
-    proc.tick(event_packet)
+    -- Spawn the shell as a tracked process.
+    local shell_pid = proc.spawn(shell_fn, {
+        name = "bsh",
+        env  = shell_env,
+        cwd  = userinfo.home,
+    })
 
-    -- If the shell process has exited, shut down.
-    if not proc.get(shell_pid) then
-        log.info("kernel", "Shell exited. Rebooting.")
+    log.info("kernel", "Shell started with pid=" .. shell_pid)
+
+    while proc.get(shell_pid) do
+        local event_packet = table.pack(os.pullEventRaw())
+        events.dispatch(event_packet)
+        proc.tick(event_packet)
+    end
+
+    log.warn("kernel", "Shell process died unexpectedly.")
+    printError("\n[KERNEL PANIC] Shell process terminated!")
+    printError("Re-launching shell in 3 seconds. Press Ctrl+T to abort and reboot.")
+
+    local timer = os.startTimer(3)
+    local abort = false
+    while true do
+        local e, p1 = os.pullEventRaw()
+        if e == "timer" and p1 == timer then
+            break
+        elseif e == "terminate" then
+            abort = true
+            break
+        end
+        -- Keep ticking other processes
+        local packet = table.pack(e, p1)
+        events.dispatch(packet)
+        proc.tick(packet)
+    end
+
+    if abort then
         break
     end
+    -- Otherwise, loops back and respawns
 end
 
+printError("\n[KERNEL] System halted. Rebooting...")
+os.sleep(1)
 os.reboot()

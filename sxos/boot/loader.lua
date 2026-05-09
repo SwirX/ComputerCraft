@@ -3,7 +3,7 @@ local configPath = "/.config/sxboot/config.lua"
 
 local config = {
     default_entry = 2,
-    timeout = 5,
+    timeout = 2,
     hidden = false,
     colors = {
         background = colors.gray,
