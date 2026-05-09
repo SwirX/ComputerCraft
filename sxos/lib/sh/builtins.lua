@@ -21,7 +21,9 @@ BUILTINS["cd"] = function(shell_state, args)
     target = expand_module.apply(target, shell_state.env, false)
     -- Resolve relative paths.
     if string.sub(target, 1, 1) ~= "/" then
-        target = fs.combine(shell_state.cwd, target)
+        target = "/" .. fs.combine(shell_state.cwd, target)
+    else
+        target = "/" .. fs.combine("", target)
     end
     if fs.exists(target) and fs.isDir(target) then
         shell_state.cwd = target

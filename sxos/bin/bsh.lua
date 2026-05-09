@@ -28,14 +28,14 @@ shell_state.process_env.shell = {
         return string.sub(shell_state.cwd, 1, 1) == "/" and string.sub(shell_state.cwd, 2) or shell_state.cwd
     end,
     setDir = function(dir)
-        local pwd = string.sub(dir, 1, 1) == "/" and dir or ("/" .. fs.combine(shell_state.cwd, dir))
+        local pwd = "/" .. fs.combine("", dir)
         shell_state.cwd = pwd
         shell_state.env.PWD = pwd
     end,
     path = function() return shell_state.env.PATH or "" end,
     setPath = function(p) shell_state.env.PATH = p end,
     resolve = function(path)
-        if string.sub(path, 1, 1) == "/" then return string.sub(path, 2) end
+        if string.sub(path, 1, 1) == "/" then return fs.combine("", path) end
         return fs.combine(shell_state.cwd, path)
     end,
     resolveProgram = function(name)
