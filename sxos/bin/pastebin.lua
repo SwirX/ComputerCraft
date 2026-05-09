@@ -7,6 +7,43 @@ if #args < 2 then
     return
 end
 
+local function check_security()
+    local user = _ENV.ENV and _ENV.ENV.USER or "root"
+    local configPath = "/home/" .. user .. "/.config/sxos/security.lua"
+    if user == "root" then configPath = "/etc/sxos/security.lua" end
+
+    local config = {}
+    if fs.exists(configPath) then
+        local f = fs.open(configPath, "r")
+        if f then
+            config = textutils.unserialize(f.readAll() or "{}") or {}; f.close()
+        end
+    end
+
+    if config.allow_unmanaged_scripts then return true end
+
+    printError("This script is not managed by SXPM.")
+    print("\nRunning arbitrary remote code may:")
+    print(" - bypass dependency validation")
+    print(" - overwrite SXOS files")
+    print(" - conflict with installed packages")
+    print(" - compromise system integrity")
+    write("\nContinue? [y/N] ")
+
+    local ans = read()
+    if ans:lower() == "y" then
+        config.allow_unmanaged_scripts = true
+        if not fs.exists(fs.getDir(configPath)) then fs.makeDir(fs.getDir(configPath)) end
+        local f = fs.open(configPath, "w")
+        if f then
+            f.write(textutils.serialize(config)); f.close()
+        end
+        return true
+    end
+    printError("Aborted.")
+    return false
+end
+
 local command = args[1]
 
 if command == "put" then
@@ -25,9 +62,9 @@ if command == "put" then
     print("Connecting to pastebin.com...")
     local key = "0rZ94E2z" -- Standard CC pastebin key
     local requestBody = "api_option=paste&api_dev_key=" ..
-    textutils.urlEncode(key) ..
-    "&api_paste_format=lua&api_paste_name=" ..
-    textutils.urlEncode(fs.getName(path)) .. "&api_paste_code=" .. textutils.urlEncode(data)
+        textutils.urlEncode(key) ..
+        "&api_paste_format=lua&api_paste_name=" ..
+        textutils.urlEncode(fs.getName(path)) .. "&api_paste_code=" .. textutils.urlEncode(data)
 
     local res = http.post("https://pastebin.com/api/api_post.php", requestBody)
     if res then
@@ -75,6 +112,7 @@ elseif command == "get" or command == "run" then
         f.close()
         print("Downloaded as " .. args[3])
     else
+        if not check_security() then return end
         local func, err = load(data, "pastebin", "t", _ENV)
         if not func then
             printError("Failed to compile downloaded code: " .. tostring(err))

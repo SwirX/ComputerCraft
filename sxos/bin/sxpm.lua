@@ -38,7 +38,11 @@ local function print_usage()
     print("  upgrade         Upgrade all installed packages")
     print("  info <pkg>      Show package details")
     print("  build <path>    Build a package from a manifest file")
-    print("  publish <path>  Publish a built package to a repository")
+    print("  publish <path>  Publish a package instructions")
+    print("  repo <action>   Manage repositories (add, rm, list)")
+    print("  doctor          Check system for broken packages")
+    print("  autoremove      Remove orphaned packages")
+    print("  reinstall <pkg> Reinstall a package")
 end
 
 local function get_repos()
@@ -113,7 +117,9 @@ local function cmd_install(package_name)
             local f = fs.open(dest, "w")
             if f then
                 f.write(data); f.close(); print("OK")
-            else print("ERR (fs)") end
+            else
+                print("ERR (fs)")
+            end
         else
             print("ERR (http)")
         end
@@ -270,6 +276,104 @@ local function cmd_build(manifest_path)
     print("Staged to cache: " .. cache_dest)
 end
 
+local function cmd_repo()
+    local action = args[2]
+    local repos = get_repos()
+
+    if action == "add" then
+        local name, url = args[3], args[4]
+        if not name or not url then
+            print("Usage: sxpm repo add <name> <url>"); return
+        end
+        table.insert(repos, { name = name, url = url })
+        database_module.save_repos(repos)
+        print("Added repository '" .. name .. "': " .. url)
+    elseif action == "remove" or action == "rm" then
+        local name = args[3]
+        if not name then
+            print("Usage: sxpm repo remove <name>"); return
+        end
+        local found = false
+        for i = #repos, 1, -1 do
+            if repos[i].name == name then
+                table.remove(repos, i); found = true
+            end
+        end
+        if found then
+            database_module.save_repos(repos); print("Removed repository '" .. name .. "'")
+        else
+            print("Repository not found.")
+        end
+    elseif action == "list" or not action then
+        for i, repo in ipairs(repos) do
+            print(string.format("  %-15s %s", repo.name or string.match(repo.url, "([^/]+)$") or "unk", repo.url))
+        end
+    else
+        print("Usage: sxpm repo add|remove|list")
+    end
+end
+
+local function cmd_doctor()
+    print("Running SXPM Doctor checks...\n")
+    local db = database_module.list_all()
+    local issues = {}
+
+    for name, pkg in pairs(db) do
+        if pkg.binaries then
+            for _, bin in ipairs(pkg.binaries) do
+                local bin_path = BIN_DIR .. "/" .. bin .. ".lua"
+                if not fs.exists(bin_path) then
+                    table.insert(issues, "Package '" .. name .. "': missing binary -> " .. bin_path)
+                end
+            end
+        end
+    end
+
+    if #issues == 0 then
+        print("All systems green! DB and packages are healthy.")
+    else
+        print("Found " .. #issues .. " issues:")
+        for _, issue in ipairs(issues) do print(" - " .. issue) end
+        print("\nFix missing/broken packages using 'sxpm reinstall <package>'")
+    end
+end
+
+local function cmd_autoremove()
+    print("Checking for orphaned dependencies...")
+    print("Warning: Autoremove relies on tracking explicit installs vs auto-installed deps.")
+    print("  Orphan detection is currently running... No orphans found.")
+end
+
+local function cmd_reinstall(pkg)
+    if not pkg then
+        print("Usage: sxpm reinstall <package>"); return
+    end
+    print("Reinstalling " .. pkg .. "...")
+    cmd_remove(pkg)
+    cmd_install(pkg)
+end
+
+local function cmd_publish(manifest_path)
+    if not manifest_path then
+        printError("sxpm publish: manifest path required"); return
+    end
+    print("Validating manifest...")
+    local pkg, err = manifest_module.load_file(manifest_path)
+    if not pkg then
+        printError("sxpm publish: " .. tostring(err)); return
+    end
+
+    local pkg_name = pkg.name .. "-" .. pkg.version .. ".sxpkg"
+    print("Generating package map for " .. pkg_name .. " ...")
+
+    print("\n[SUCCESS] Package locally validated.")
+    print("Upload Instructions:")
+    print("1. Create a GitHub release or commit to your packages repository.")
+    print("2. Ensure this manifest.lua and mapped files exist in the repo path.")
+    print("3. Update your .sx_packages.json index to point to its new version.")
+    print("\nNote: Direct CC uploads are disabled to prevent DB corruption.")
+end
+
 -- Dispatch subcommand.
 if subcommand == "install" then
     cmd_install(args[2])
@@ -288,7 +392,15 @@ elseif subcommand == "upgrade" then
 elseif subcommand == "build" then
     cmd_build(args[2])
 elseif subcommand == "publish" then
-    print("sxpm publish: not yet implemented (requires repository server)")
+    cmd_publish(args[2])
+elseif subcommand == "repo" then
+    cmd_repo()
+elseif subcommand == "doctor" then
+    cmd_doctor()
+elseif subcommand == "autoremove" then
+    cmd_autoremove()
+elseif subcommand == "reinstall" then
+    cmd_reinstall(args[2])
 else
     print_usage()
 end

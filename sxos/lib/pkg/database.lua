@@ -88,4 +88,13 @@ function database.load_repos()
     return {}
 end
 
+function database.save_repos(repos)
+    ensure_dirs()
+    local f = fs.open(REPO_CONFIG_PATH, "w")
+    if f then
+        f.write("return " .. textutils.serialize(repos))
+        f.close()
+    end
+end
+
 return database
