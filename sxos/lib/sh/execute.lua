@@ -140,7 +140,8 @@ local function execute_command(node, shell_state, override_stdio)
         return true
     end
 
-    return run_external(exec_path, expanded_args, stdio, shell_state)
+    run_external(exec_path, expanded_args, stdio, shell_state)
+    return true
 end
 
 -- Execute a pipeline: cmd1 | cmd2 | cmd3
