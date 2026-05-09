@@ -5,6 +5,9 @@ if #args < 1 then
 end
 
 local url = args[1]
+if not string.find(url, "^https?://") then
+    url = "http://" .. url
+end
 local res = http.get(url)
 if res then
     print(res.readAll())

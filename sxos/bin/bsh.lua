@@ -4,25 +4,60 @@
 -- /lib/sh/. This file owns the interactive loop, the read-line UI, and
 -- the mutable shell_state table shared with builtins.
 
-local tokenizer    = dofile("/lib/sh/tokenizer.lua")
-local parser       = dofile("/lib/sh/parser.lua")
-local execute      = dofile("/lib/sh/execute.lua")
-local completion   = dofile("/lib/sh/completion.lua")
+local tokenizer               = dofile("/lib/sh/tokenizer.lua")
+local parser                  = dofile("/lib/sh/parser.lua")
+local execute                 = dofile("/lib/sh/execute.lua")
+local completion              = dofile("/lib/sh/completion.lua")
 
 -- shell_state is passed to builtins and the executor.
 -- It is the single authoritative source for mutable shell context.
-local shell_state  = {
+local shell_state             = {
     cwd         = _ENV.ENV.HOME or "/",
     env         = _ENV.ENV,
     aliases     = { ll = "ls -l", la = "ls -a" },
     process_env = _ENV,
     history     = {},
 }
-_ENV.ENV.PWD       = shell_state.cwd
+_ENV.ENV.PWD                  = shell_state.cwd
 
-local user         = _ENV.ENV.USER or "user"
-local hostname     = _ENV.ENV.HOSTNAME or "sxos"
-local is_installer = _ENV.INSTALLER_MODE or false
+-- CraftOS Compatibility Layer:
+-- Expose a `shell` object so standard CC programs work seamlessly.
+shell_state.process_env.shell = {
+    exit = function() return end,
+    dir = function()
+        return string.sub(shell_state.cwd, 1, 1) == "/" and string.sub(shell_state.cwd, 2) or shell_state.cwd
+    end,
+    setDir = function(dir)
+        local pwd = string.sub(dir, 1, 1) == "/" and dir or ("/" .. fs.combine(shell_state.cwd, dir))
+        shell_state.cwd = pwd
+        shell_state.env.PWD = pwd
+    end,
+    path = function() return shell_state.env.PATH or "" end,
+    setPath = function(p) shell_state.env.PATH = p end,
+    resolve = function(path)
+        if string.sub(path, 1, 1) == "/" then return string.sub(path, 2) end
+        return fs.combine(shell_state.cwd, path)
+    end,
+    resolveProgram = function(name)
+        if shell_state.aliases[name] then return name end
+        local path_str = shell_state.env.PATH or "/bin;/usr/bin"
+        for dir in string.gmatch(path_str, "[^;:]+") do
+            local candidate = fs.combine(dir, name)
+            if fs.exists(candidate) and not fs.isDir(candidate) then return candidate end
+            if fs.exists(candidate .. ".lua") and not fs.isDir(candidate .. ".lua") then return candidate .. ".lua" end
+        end
+        return nil
+    end,
+    aliases = function() return shell_state.aliases end,
+    setAlias = function(name, value) shell_state.aliases[name] = value end,
+    clearAlias = function(name) shell_state.aliases[name] = nil end,
+    programs = function() return {} end,
+    getRunningProgram = function() return "bsh" end
+}
+
+local user                    = _ENV.ENV.USER or "user"
+local hostname                = _ENV.ENV.HOSTNAME or "sxos"
+local is_installer            = _ENV.INSTALLER_MODE or false
 
 -- -----------------------------------------------------------------------
 -- Prompt rendering
