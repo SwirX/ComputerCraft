@@ -37,11 +37,12 @@ Administrators can directly copy the source directory into the root environment 
 
 ## Advanced Installation Guidelines
 
-If deploying SXOS via the **Advanced Install** wizard, ensure that:
-* Core package managers are synced post-installation using `sxpm sync`.
-* Custom shell profiles are correctly configured under `~/.config/bsh/theme.lua`.
-* Desired RPC discovery daemons are enabled properly within internal service definitions.
-* You initialize your root administrative variables accordingly, as default values are bypassed to provide custom configuration capabilities completely.
+If deploying SXOS via the **Advanced Install** wizard or building via a direct source hierarchy layout blindly, please strictly consult our complete [Manual Installation Guide](wiki/Manual-Installation.md) for explicit file configurations.
+
+Ensure that:
+* You layout the core directories like `/etc/sxos` effectively.
+* You construct `/etc/sxos/users` and `/etc/sxos/shadow` accurately ensuring your core user is defined properly.
+* You initialize the final `/etc/sxos/config.lua` setting `installed = true`.
 
 This process eliminates redundant background configurations for dedicated cluster deployment usage.
 
