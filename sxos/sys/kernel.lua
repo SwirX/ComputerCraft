@@ -92,13 +92,6 @@ term.setTextColor(colors.lightGray)
 term.clear()
 term.setCursorPos(1, 1)
 
--- Spawn the shell as a tracked process.
-local shell_pid = proc.spawn(shell_fn, {
-    name = "bsh",
-    env  = shell_env,
-    cwd  = userinfo.home,
-})
-
 -- Main kernel event loop.
 -- The kernel owns os.pullEvent and dispatches each event to:
 --   1. The event router (for all subscribers)
