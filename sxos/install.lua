@@ -1,37 +1,110 @@
 -- SXOS Installation Selector
 
 local filesToDownload = {
+    -- Root
     "/startup.lua",
+    "/README.md",
+
+    -- Installer selectors
     "/installers/easy.lua",
     "/installers/advanced.lua",
+
+    -- Bootloader
     "/boot/loader.lua",
+
+    -- System skeleton
     "/etc/skel/config/sxboot/config.lua",
+
+    -- Kernel and core sys modules
     "/sys/kernel.lua",
     "/sys/env.lua",
     "/sys/auth.lua",
+
+    -- Core libraries
+    "/lib/core/log.lua",
+    "/lib/core/env.lua",
+    "/lib/core/events.lua",
+    "/lib/core/process.lua",
+    "/lib/core/service.lua",
+    "/lib/core/sx.lua",
+
+    -- Filesystem libraries
+    "/lib/fs/vfs.lua",
+    "/lib/fs/path.lua",
+    "/lib/fs/permissions.lua",
+
+    -- Shell libraries
+    "/lib/sh/builtins.lua",
+    "/lib/sh/completion.lua",
+    "/lib/sh/execute.lua",
+    "/lib/sh/expand.lua",
+    "/lib/sh/parser.lua",
+    "/lib/sh/tokenizer.lua",
+
+    -- Network libraries
+    "/lib/net/discovery.lua",
+    "/lib/net/rednet.lua",
+
+    -- Package manager libraries
+    "/lib/pkg/database.lua",
+    "/lib/pkg/manifest.lua",
+    "/lib/pkg/resolve.lua",
+
+    -- SX config + VFS shim
     "/lib/sx/config.lua",
+    "/lib/sx/vfs.lua",
+
+    -- UI library
+    "/lib/ui/theme.lua",
+
+    -- Services
+    "/services/discoverd.lua",
+
+    -- Core binaries
     "/bin/bsh.lua",
-    "/bin/cd.lua",
-    "/bin/pwd.lua",
-    "/bin/mkdir.lua",
-    "/bin/mkcd.lua",
-    "/bin/touch.lua",
-    "/bin/rm.lua",
     "/bin/cat.lua",
-    "/bin/ls.lua",
-    "/bin/cp.lua",
-    "/bin/mv.lua",
+    "/bin/cd.lua",
+    "/bin/chmod.lua",
+    "/bin/chown.lua",
     "/bin/clear.lua",
-    "/bin/wget.lua",
+    "/bin/cp.lua",
     "/bin/curl.lua",
+    "/bin/discover.lua",
+    "/bin/echo.lua",
+    "/bin/env.lua",
+    "/bin/find.lua",
     "/bin/git.lua",
+    "/bin/grep.lua",
+    "/bin/help.lua",
+    "/bin/jobs.lua",
+    "/bin/kill.lua",
+    "/bin/ln.lua",
+    "/bin/ls.lua",
+    "/bin/lua.lua",
+    "/bin/mkcd.lua",
+    "/bin/mkdir.lua",
+    "/bin/mount.lua",
+    "/bin/mv.lua",
+    "/bin/netstat.lua",
+    "/bin/ping.lua",
+    "/bin/printf.lua",
+    "/bin/ps.lua",
+    "/bin/pwd.lua",
     "/bin/reboot.lua",
+    "/bin/rm.lua",
     "/bin/shutdown.lua",
-    "/usr/bin/yate.lua",
-    "/usr/bin/yafe.lua",
+    "/bin/sxpm.lua",
+    "/bin/touch.lua",
+    "/bin/umount.lua",
+    "/bin/wget.lua",
+    "/bin/which.lua",
+
+    -- User binaries
     "/usr/bin/sxfetch.lua",
-    "/README.md"
+    "/usr/bin/yafe.lua",
+    "/usr/bin/yate.lua",
 }
+
 
 term.clear()
 term.setCursorPos(1, 1)

@@ -1,37 +1,19 @@
+-- /sys/env.lua
+-- Process environment façade for the SXOS installer tools.
+-- This file is intentionally loaded via dofile() by the advanced installer,
+-- so it must NOT call require() at the module level (package.path is not yet
+-- configured at that point).  All dependencies are loaded with loadfile().
+
 local _M = {}
-local vfs = require("lib.sx.vfs")
-vfs.init()
 
-function _M.create_process_env(parentEnv, envVars)
-    -- inherits from parentEnv, but constructs a custom cc.require
-    local newEnv = {}
-    for k, v in pairs(parentEnv or _G) do
-        if k ~= "fs" then newEnv[k] = v end
-    end
-
-    newEnv._ENV = newEnv
-
-    -- setup ENV vars
-    newEnv.ENV = envVars or {
-        PATH = "/bin;/usr/bin",
-        HOME = "/root",
-        USER = "root"
-    }
-
-    -- inject VFS sandbox logic to lock IO
-    newEnv.fs = vfs.create_fs(newEnv.ENV.USER)
-
-    -- set up custom require using cc.require.make
-    -- this ensures that module contexts do not bleed into the global CraftOS package
-    local cc_req = require("cc.require")
-    local req, pkg = cc_req.make(newEnv, "/")
-    newEnv.require = req
-    newEnv.package = pkg
-
-    -- provide custom package paths
-    newEnv.package.path = "/lib/?.lua;/usr/lib/?.lua;/?/init.lua;/?.lua"
-
-    return newEnv
+-- Load the canonical implementation from lib/core/env.lua.
+local core_env_chunk, err = loadfile("/lib/core/env.lua")
+if not core_env_chunk then
+    error("sys/env.lua: cannot load /lib/core/env.lua: " .. tostring(err), 0)
 end
+local core_env = core_env_chunk()
+
+-- Re-export create_process_env so callers can use this file transparently.
+_M.create_process_env = core_env.create_process_env
 
 return _M
